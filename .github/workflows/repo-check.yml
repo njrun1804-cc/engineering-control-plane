@@ -48,9 +48,6 @@ jobs:
     name: repo-check
     runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.timeout_minutes }}
-    defaults:
-      run:
-        working-directory: ${{ inputs.working_directory }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -69,20 +66,24 @@ jobs:
           node-version: ${{ inputs.node_version }}
       - name: Prepare platform tools
         if: inputs.prepare_command != ''
+        working-directory: ${{ inputs.working_directory }}
         env:
           PREPARE_COMMAND: ${{ inputs.prepare_command }}
         run: bash -euo pipefail -c "$PREPARE_COMMAND"
       - name: Sync dependencies
         if: inputs.sync_command != ''
+        working-directory: ${{ inputs.working_directory }}
         env:
           SYNC_COMMAND: ${{ inputs.sync_command }}
         run: bash -euo pipefail -c "$SYNC_COMMAND"
       - name: Run repository gate
+        working-directory: ${{ inputs.working_directory }}
         env:
           CHECK_COMMAND: ${{ inputs.check_command }}
         run: bash -euo pipefail -c "$CHECK_COMMAND"
       - name: Validate receipt
         if: inputs.receipt_command != ''
+        working-directory: ${{ inputs.working_directory }}
         env:
           RECEIPT_COMMAND: ${{ inputs.receipt_command }}
         run: bash -euo pipefail -c "$RECEIPT_COMMAND"
