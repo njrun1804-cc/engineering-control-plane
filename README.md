@@ -10,14 +10,15 @@ and availability.
 
 ## Reusable workflows
 
-- `repo-check.yml`: one Linux deterministic gate with closed `warren` and `control-plane` profiles.
+- `repo-check.yml`: one Linux deterministic gate with a closed set of active repository profiles.
 - `codeql.yml`: high-precision CodeQL analysis where GitHub Code Security is enabled.
 - `dependency-review.yml`: pull-request dependency diff gate where GitHub Code Security is enabled.
 
 Consumers pin reusable workflows to a full commit SHA. Updates are deliberate fleet migrations,
 not mutable-tag changes.
 
-`policies/default-branch-ruleset.json` is the applied organization ruleset source. It requires a
+`policies/default-branch-ruleset.json` is the applied organization ruleset source. Archived legacy
+repositories are explicitly excluded. For active repositories it requires a
 pull request, the common `repo-check / repo-check` status, current-base testing, resolved
 conversations, squash merging, linear history, and no force-push or deletion on each default
 branch.
