@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   repo-check:
-    if: ${{ !contains(fromJSON('["seraph","cloudops","atlas"]'), inputs.profile) }}
+    if: ${{ ! contains(fromJSON('["seraph","cloudops","atlas"]'), inputs.profile) }}
     name: repo-check
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -91,7 +91,7 @@ jobs:
           esac
 
       - name: Install frozen Python dependencies
-        if: ${{ !contains(fromJSON('["control-plane","eats"]'), inputs.profile) }}
+        if: ${{ ! contains(fromJSON('["control-plane","eats"]'), inputs.profile) }}
         env:
           PROFILE: ${{ inputs.profile }}
         run: |
@@ -138,7 +138,7 @@ jobs:
         run: npm ci --prefix eats --prefer-offline --no-audit
 
       - name: Run canonical repository gate
-        if: ${{ !contains(fromJSON('["control-plane"]'), inputs.profile) }}
+        if: inputs.profile != 'control-plane'
         env:
           PROFILE: ${{ inputs.profile }}
         run: |
@@ -149,7 +149,7 @@ jobs:
           esac
 
       - name: Validate authoritative receipt
-        if: ${{ !contains(fromJSON('["control-plane"]'), inputs.profile) }}
+        if: inputs.profile != 'control-plane'
         run: scripts/check-status.sh --strict
 
       - name: Validate control-plane JSON and YAML
