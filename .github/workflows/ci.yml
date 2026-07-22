@@ -28,7 +28,7 @@ jobs:
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
       - name: Validate JSON and YAML
         run: |
-          jq empty .greptile/config.json 2>/dev/null || test ! -e .greptile/config.json
+          find . -path ./.git -prune -o -name '*.json' -type f -print0 | xargs -0 -r jq empty
           for file in .github/*.yml .github/workflows/*.yml; do
             ruby -e 'require "yaml"; YAML.safe_load(File.read(ARGV[0]), permitted_classes: [], aliases: true)' "$file"
           done

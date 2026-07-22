@@ -16,6 +16,10 @@ permissions and availability.
 Consumers pin reusable workflows to a full commit SHA. Updates are deliberate fleet migrations,
 not mutable-tag changes.
 
+`policies/default-branch-ruleset.json` is the applied organization ruleset source. It requires a
+pull request, the common `repo-check` status, current-base testing, resolved conversations, linear
+history, and no force-push or deletion on each default branch.
+
 macOS is not a default matrix dimension. A repository may add a targeted macOS job only when it
 tests an Apple-specific runtime, framework, filesystem behavior, or packaging artifact that Linux
 cannot exercise.
