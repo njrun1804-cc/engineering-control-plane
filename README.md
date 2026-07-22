@@ -1,0 +1,21 @@
+# Engineering control plane
+
+Maintainer-owned reusable CI and policy for active `njrun1804-cc` repositories.
+
+The common contract is evidence, not identical toolchains. Each repository supplies its native
+sync and check commands; the control plane supplies a hardened, consistently named execution
+envelope. Security analysis remains a separate orthogonal job because it has different GitHub
+permissions and availability.
+
+## Reusable workflows
+
+- `repo-check.yml`: one Linux deterministic gate named `repo-check`.
+- `codeql.yml`: high-precision CodeQL analysis where GitHub Code Security is enabled.
+- `dependency-review.yml`: pull-request dependency diff gate where GitHub Code Security is enabled.
+
+Consumers pin reusable workflows to a full commit SHA. Updates are deliberate fleet migrations,
+not mutable-tag changes.
+
+macOS is not a default matrix dimension. A repository may add a targeted macOS job only when it
+tests an Apple-specific runtime, framework, filesystem behavior, or packaging artifact that Linux
+cannot exercise.

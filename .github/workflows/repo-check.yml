@@ -1,0 +1,88 @@
+name: Reusable repository check
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: GitHub-hosted runner label
+        type: string
+        default: ubuntu-24.04
+      timeout_minutes:
+        description: Hard timeout for the repository gate
+        type: number
+        default: 20
+      python_version:
+        description: Python version; empty disables uv setup
+        type: string
+        default: ""
+      node_version:
+        description: Node version; empty disables Node setup
+        type: string
+        default: ""
+      working_directory:
+        description: Repository-relative command directory
+        type: string
+        default: .
+      prepare_command:
+        description: Optional platform-tool preparation command
+        type: string
+        default: ""
+      sync_command:
+        description: Optional frozen dependency installation command
+        type: string
+        default: ""
+      check_command:
+        description: Authoritative repository-native check command
+        type: string
+        required: true
+      receipt_command:
+        description: Optional independent receipt validation command
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  repo-check:
+    name: repo-check
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout_minutes }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working_directory }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up uv and Python
+        if: inputs.python_version != ''
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          python-version: ${{ inputs.python_version }}
+          enable-cache: true
+      - name: Set up Node
+        if: inputs.node_version != ''
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.node_version }}
+      - name: Prepare platform tools
+        if: inputs.prepare_command != ''
+        env:
+          PREPARE_COMMAND: ${{ inputs.prepare_command }}
+        run: bash -euo pipefail -c "$PREPARE_COMMAND"
+      - name: Sync dependencies
+        if: inputs.sync_command != ''
+        env:
+          SYNC_COMMAND: ${{ inputs.sync_command }}
+        run: bash -euo pipefail -c "$SYNC_COMMAND"
+      - name: Run repository gate
+        env:
+          CHECK_COMMAND: ${{ inputs.check_command }}
+        run: bash -euo pipefail -c "$CHECK_COMMAND"
+      - name: Validate receipt
+        if: inputs.receipt_command != ''
+        env:
+          RECEIPT_COMMAND: ${{ inputs.receipt_command }}
+        run: bash -euo pipefail -c "$RECEIPT_COMMAND"
