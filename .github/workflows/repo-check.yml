@@ -185,6 +185,7 @@ jobs:
       - name: Validate control-plane JSON and YAML
         if: inputs.profile == 'control-plane'
         run: |
+          python3 scripts/mirror_agents.py --check
           find . -path ./.git -prune -o -name '*.json' -type f -print0 | xargs -0 -r jq empty
           for file in .github/*.yml .github/workflows/*.yml; do
             ruby -e 'require "yaml"; YAML.safe_load(File.read(ARGV[0]), permitted_classes: [], aliases: true)' "$file"
