@@ -5,8 +5,21 @@
   "bypass_actors": [],
   "conditions": {
     "repository_name": {
-      "include": ["~ALL"],
-      "exclude": ["Clash", "ClashROI", "Gabriel", "Morpheus", "Unity"],
+      "include": [
+        "atlas",
+        "Bambu",
+        "Blueprint",
+        "CloudOps",
+        "Contracts",
+        "eats",
+        "HomeNet",
+        "Lightroom",
+        "Seraph",
+        "Warren",
+        "Zion",
+        "engineering-control-plane"
+      ],
+      "exclude": [],
       "protected": false
     },
     "ref_name": {
@@ -25,6 +38,7 @@
         "require_code_owner_review": false,
         "require_last_push_approval": false,
         "required_approving_review_count": 0,
+        "required_reviewers": [],
         "required_review_thread_resolution": true,
         "allowed_merge_methods": ["squash"]
       }
@@ -32,9 +46,9 @@
     {
       "type": "required_status_checks",
       "parameters": {
-        "do_not_enforce_on_create": true,
+        "do_not_enforce_on_create": false,
         "required_status_checks": [
-          {"context": "repo-check / repo-check"}
+          {"context": "repo-check / repo-check", "integration_id": 15368}
         ],
         "strict_required_status_checks_policy": true
       }

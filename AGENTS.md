@@ -1,7 +1,9 @@
+<!-- GENERATED from CLAUDE.md by scripts/mirror_agents.py — edit CLAUDE.md, never this file. -->
 # Engineering control plane
 
-This private repository owns shared CI execution and protected acceptance-test policy for
-`njrun1804-cc`.
+This public, credential-free repository owns reusable CI execution and policy for
+`njrun1804-cc`. It contains checks and policy only, never application code, protected acceptance
+tests, or secrets. Protected acceptance tests belong in a separate private repository.
 
 - Keep third-party Actions pinned to full commit SHAs.
 - Default `GITHUB_TOKEN` permissions are read-only.

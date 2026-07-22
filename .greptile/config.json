@@ -1,0 +1,7 @@
+{
+  "strictness": 2,
+  "commentTypes": ["logic", "syntax"],
+  "triggerOnUpdates": true,
+  "triggerOnDrafts": false,
+  "shouldUpdateDescription": false
+}
