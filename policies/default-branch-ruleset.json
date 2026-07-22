@@ -26,7 +26,7 @@
         "require_last_push_approval": false,
         "required_approving_review_count": 0,
         "required_review_thread_resolution": true,
-        "allowed_merge_methods": ["squash", "merge", "rebase"]
+        "allowed_merge_methods": ["squash"]
       }
     },
     {
@@ -34,7 +34,7 @@
       "parameters": {
         "do_not_enforce_on_create": true,
         "required_status_checks": [
-          {"context": "repo-check"}
+          {"context": "repo-check / repo-check"}
         ],
         "strict_required_status_checks_policy": true
       }
