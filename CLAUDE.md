@@ -1,7 +1,8 @@
 # Engineering control plane
 
-This private repository owns shared CI execution and protected acceptance-test policy for
-`njrun1804-cc`.
+This public repository owns shared CI execution and policy for `njrun1804-cc`. It is public so
+public repositories can call its reusable workflows. Protected acceptance tests belong in a
+separate private repository.
 
 - Keep third-party Actions pinned to full commit SHAs.
 - Default `GITHUB_TOKEN` permissions are read-only.
