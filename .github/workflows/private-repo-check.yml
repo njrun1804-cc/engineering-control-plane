@@ -39,6 +39,8 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::322814813391:role/CloudOpsPackageReaderRole
           aws-region: us-east-1
+          retry-max-attempts: 3
+          action-timeout-s: 120
 
       - name: Mint and mask frozen-resolution credential
         run: |
