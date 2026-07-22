@@ -66,6 +66,15 @@ jobs:
             thesis/package-lock.json
             vendor/automaat-lightroom-mcp/server/package-lock.json
 
+      - name: Restore pinned Lightroom tools
+        if: inputs.profile == 'lightroom'
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/.cargo/bin/stylua
+            ~/.luarocks
+          key: lightroom-tools-${{ runner.os }}-lua-5.4-stylua-2.5.2-luacheck-1.2.0
+
       - name: Install profile system tools
         if: contains(fromJSON('["zion","blueprint","lightroom","eats"]'), inputs.profile)
         env:
@@ -83,11 +92,25 @@ jobs:
             lightroom)
               sudo apt-get update -qq
               sudo apt-get install -y --no-install-recommends lua5.4 liblua5.4-dev luarocks libvips-dev
-              sudo luarocks install luacheck
-              cargo install stylua --locked --root "$HOME/.cargo"
-              echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
               ;;
           esac
+
+      - name: Install pinned Lightroom tools on cache miss
+        if: inputs.profile == 'lightroom'
+        env:
+          LUACHECK_VERSION: 1.2.0
+          STYLUA_VERSION: 2.5.2
+        run: |
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.luarocks/bin" >> "$GITHUB_PATH"
+          if [[ ! -x "$HOME/.cargo/bin/stylua" ]]; then
+            cargo install stylua --version "$STYLUA_VERSION" --locked --root "$HOME/.cargo"
+          fi
+          if [[ ! -x "$HOME/.luarocks/bin/luacheck" ]]; then
+            luarocks --lua-version=5.4 --local install luacheck "$LUACHECK_VERSION"
+          fi
+          "$HOME/.cargo/bin/stylua" --version
+          "$HOME/.luarocks/bin/luacheck" --version
 
       - name: Install frozen Python dependencies
         if: ${{ ! contains(fromJSON('["control-plane","eats"]'), inputs.profile) }}
