@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   repo-check:
@@ -19,7 +18,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
-      id-token: write
+      id-token: write # exchange GitHub OIDC for the read-only CodeArtifact role
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
