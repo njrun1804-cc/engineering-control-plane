@@ -5,6 +5,12 @@ This public, credential-free repository owns reusable CI execution and policy fo
 `njrun1804-cc`. It contains checks and policy only, never application code, protected acceptance
 tests, or secrets. Protected acceptance tests belong in a separate private repository.
 
+## Agent verification loop
+
+- Each implementation task names and runs its exact targeted checks.
+- Subagents run only those commands and never invoke a repository-wide gate.
+- Before delivery, root runs the control-plane validation once; GitHub independently repeats it.
+
 - Keep third-party Actions pinned to full commit SHAs.
 - Default `GITHUB_TOKEN` permissions are read-only.
 - Keep deterministic repository checks authoritative; AI review is additional evidence.
