@@ -26,6 +26,8 @@ jobs:
           persist-credentials: false
       - name: Set up uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: false
       - name: Validate JSON and YAML
         run: |
           find . -path ./.git -prune -o -name '*.json' -type f -print0 | xargs -0 -r jq empty
