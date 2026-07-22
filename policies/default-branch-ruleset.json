@@ -6,7 +6,7 @@
   "conditions": {
     "repository_name": {
       "include": ["~ALL"],
-      "exclude": ["Actual", "Bambu", "Blueprint", "Gabriel", "Morpheus", "Runner", "Unity"],
+      "exclude": ["Clash", "ClashROI", "Gabriel", "Morpheus", "Unity"],
       "protected": false
     },
     "ref_name": {

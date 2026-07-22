@@ -2,6 +2,11 @@
 
 Maintainer-owned reusable CI and policy for active `njrun1804-cc` repositories.
 
+This execution repository is public because GitHub permits a public repository such as Bambu to
+call reusable workflows only from another public repository. It contains no application secrets
+or protected sentinel tests. Any held-out acceptance oracle belongs in a separate private
+repository.
+
 The common contract is evidence, not identical toolchains. Each repository selects a closed,
 maintainer-owned profile; callers cannot supply shell commands, runner labels, credentials, or
 permissions. The control plane supplies a hardened, consistently named execution envelope.
@@ -17,7 +22,7 @@ and availability.
 Consumers pin reusable workflows to a full commit SHA. Updates are deliberate fleet migrations,
 not mutable-tag changes.
 
-`policies/default-branch-ruleset.json` is the applied organization ruleset source. Archived legacy
+`policies/default-branch-ruleset.json` is the applied organization ruleset source. Retired
 repositories are explicitly excluded. For active repositories it requires a
 pull request, the common `repo-check / repo-check` status, current-base testing, resolved
 conversations, squash merging, linear history, and no force-push or deletion on each default
