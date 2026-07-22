@@ -15,40 +15,142 @@ jobs:
   repo-check:
     name: repo-check
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Validate profile
+
+      - name: Validate closed profile
         env:
           PROFILE: ${{ inputs.profile }}
         run: |
           case "$PROFILE" in
-            control-plane|warren) ;;
+            control-plane|warren|homenet|bambu|zion|blueprint|lightroom|contracts|eats) ;;
             *) echo "Unsupported centrally owned profile: $PROFILE" >&2; exit 2 ;;
           esac
-      - name: Set up uv and Python for Warren
-        if: inputs.profile == 'warren'
+
+      - name: Set up uv and Python
+        if: inputs.profile != 'control-plane'
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          python-version: "3.13"
+          python-version: ${{ inputs.profile == 'bambu' && '3.12' || '3.13' }}
           enable-cache: true
+
       - name: Set up uv for control-plane audit
         if: inputs.profile == 'control-plane'
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           enable-cache: false
-      - name: Sync Warren dependencies
-        if: inputs.profile == 'warren'
-        run: uv sync --frozen --dev
-      - name: Run Warren repository gate
-        if: inputs.profile == 'warren'
-        run: scripts/check.sh
-      - name: Validate Warren receipt
-        if: inputs.profile == 'warren'
+
+      - name: Set up Node
+        if: contains(fromJSON('["homenet","blueprint","lightroom","eats"]'), inputs.profile)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ inputs.profile == 'blueprint' && '25' || '24' }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            eats/package-lock.json
+            shell/package-lock.json
+            mike/package-lock.json
+            nsa/package-lock.json
+            vbr/package-lock.json
+            cockpit/package-lock.json
+            plan/package-lock.json
+            status/package-lock.json
+            plate/package-lock.json
+            thesis/package-lock.json
+            vendor/automaat-lightroom-mcp/server/package-lock.json
+
+      - name: Install profile system tools
+        if: contains(fromJSON('["zion","blueprint","lightroom","eats"]'), inputs.profile)
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          case "$PROFILE" in
+            zion)
+              sudo apt-get update -qq
+              sudo apt-get install -y --no-install-recommends shellcheck ripgrep
+              ;;
+            blueprint|eats)
+              sudo apt-get update -qq
+              sudo apt-get install -y --no-install-recommends shellcheck
+              ;;
+            lightroom)
+              sudo apt-get update -qq
+              sudo apt-get install -y --no-install-recommends lua5.4 liblua5.4-dev luarocks libvips-dev
+              sudo luarocks install luacheck
+              cargo install stylua --locked --root "$HOME/.cargo"
+              echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+              ;;
+          esac
+
+      - name: Install frozen Python dependencies
+        if: ${{ ! contains(fromJSON('["control-plane","eats"]'), inputs.profile) }}
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          case "$PROFILE" in
+            warren|zion) uv sync --frozen --dev ;;
+            homenet) uv sync --locked ;;
+            bambu) uv sync --frozen --all-groups ;;
+            blueprint) uv sync --frozen --extra dev ;;
+            lightroom|contracts) uv sync --frozen ;;
+          esac
+
+      - name: Install Blueprint application dependencies
+        if: inputs.profile == 'blueprint'
+        run: |
+          dirs=(shell mike nsa vbr cockpit plan status plate thesis)
+          failed=0
+          pids=()
+          batch_dirs=()
+          wait_batch() {
+            local index
+            for index in "${!pids[@]}"; do
+              if ! wait "${pids[$index]}"; then
+                failed=1
+              fi
+              echo "===== npm ci --prefix ${batch_dirs[$index]} ====="
+              cat "$RUNNER_TEMP/npm-${batch_dirs[$index]}.log"
+            done
+            pids=()
+            batch_dirs=()
+          }
+          for dir in "${dirs[@]}"; do
+            npm ci --prefix "$dir" >"$RUNNER_TEMP/npm-$dir.log" 2>&1 &
+            pids+=("$!")
+            batch_dirs+=("$dir")
+            if (( ${#pids[@]} == 4 )); then
+              wait_batch
+            fi
+          done
+          wait_batch
+          exit "$failed"
+
+      - name: Install Eats dependencies
+        if: inputs.profile == 'eats'
+        run: npm ci --prefix eats --prefer-offline --no-audit
+
+      - name: Run canonical repository gate
+        if: inputs.profile != 'control-plane'
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          case "$PROFILE" in
+            homenet) ./check.sh ;;
+            zion) ZION_SKIP_DRIFT=1 ZION_SKIP_WORKSPACE=1 scripts/check.sh ;;
+            *) scripts/check.sh ;;
+          esac
+
+      - name: Validate authoritative receipt
+        if: inputs.profile != 'control-plane'
         run: scripts/check-status.sh --strict
+
       - name: Validate control-plane JSON and YAML
         if: inputs.profile == 'control-plane'
         run: |
@@ -56,6 +158,7 @@ jobs:
           for file in .github/*.yml .github/workflows/*.yml; do
             ruby -e 'require "yaml"; YAML.safe_load(File.read(ARGV[0]), permitted_classes: [], aliases: true)' "$file"
           done
+
       - name: Audit control-plane workflow security
         if: inputs.profile == 'control-plane'
         run: uvx zizmor==1.28.0 .github/workflows
