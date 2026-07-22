@@ -29,7 +29,7 @@ jobs:
           PROFILE: ${{ inputs.profile }}
         run: |
           case "$PROFILE" in
-            control-plane|warren|homenet|bambu|zion|blueprint|lightroom|contracts|eats) ;;
+            control-plane|warren|homenet|zion|lightroom|contracts|eats) ;;
             *) echo "Unsupported centrally owned profile: $PROFILE" >&2; exit 2 ;;
           esac
 
@@ -37,7 +37,7 @@ jobs:
         if: inputs.profile != 'control-plane'
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
-          python-version: ${{ inputs.profile == 'bambu' && '3.12' || '3.13' }}
+          python-version: '3.13'
           enable-cache: true
 
       - name: Set up uv for control-plane audit
@@ -47,23 +47,14 @@ jobs:
           enable-cache: false
 
       - name: Set up Node
-        if: contains(fromJSON('["homenet","blueprint","lightroom","eats"]'), inputs.profile)
+        if: contains(fromJSON('["homenet","lightroom","eats"]'), inputs.profile)
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: ${{ inputs.profile == 'blueprint' && '25' || '24' }}
+          node-version: '24'
           cache: npm
           cache-dependency-path: |
             package-lock.json
             eats/package-lock.json
-            shell/package-lock.json
-            mike/package-lock.json
-            nsa/package-lock.json
-            vbr/package-lock.json
-            cockpit/package-lock.json
-            plan/package-lock.json
-            status/package-lock.json
-            plate/package-lock.json
-            thesis/package-lock.json
             vendor/automaat-lightroom-mcp/server/package-lock.json
 
       - name: Restore pinned Lightroom tools
@@ -76,7 +67,7 @@ jobs:
           key: lightroom-tools-${{ runner.os }}-lua-5.4-stylua-2.5.2-luacheck-1.2.0
 
       - name: Install profile system tools
-        if: contains(fromJSON('["zion","blueprint","lightroom","eats"]'), inputs.profile)
+        if: contains(fromJSON('["zion","lightroom","eats"]'), inputs.profile)
         env:
           PROFILE: ${{ inputs.profile }}
         run: |
@@ -85,7 +76,7 @@ jobs:
               sudo apt-get update -qq
               sudo apt-get install -y --no-install-recommends shellcheck ripgrep
               ;;
-            blueprint|eats)
+            eats)
               sudo apt-get update -qq
               sudo apt-get install -y --no-install-recommends shellcheck
               ;;
@@ -120,40 +111,8 @@ jobs:
           case "$PROFILE" in
             warren|zion) uv sync --frozen --dev ;;
             homenet) uv sync --locked ;;
-            bambu) uv sync --frozen --all-groups ;;
-            blueprint) uv sync --frozen --extra dev ;;
             lightroom|contracts) uv sync --frozen ;;
           esac
-
-      - name: Install Blueprint application dependencies
-        if: inputs.profile == 'blueprint'
-        run: |
-          dirs=(shell mike nsa vbr cockpit plan status plate thesis)
-          failed=0
-          pids=()
-          batch_dirs=()
-          wait_batch() {
-            local index
-            for index in "${!pids[@]}"; do
-              if ! wait "${pids[$index]}"; then
-                failed=1
-              fi
-              echo "===== npm ci --prefix ${batch_dirs[$index]} ====="
-              cat "$RUNNER_TEMP/npm-${batch_dirs[$index]}.log"
-            done
-            pids=()
-            batch_dirs=()
-          }
-          for dir in "${dirs[@]}"; do
-            npm ci --prefix "$dir" >"$RUNNER_TEMP/npm-$dir.log" 2>&1 &
-            pids+=("$!")
-            batch_dirs+=("$dir")
-            if (( ${#pids[@]} == 4 )); then
-              wait_batch
-            fi
-          done
-          wait_batch
-          exit "$failed"
 
       - name: Restore Eats node_modules
         if: inputs.profile == 'eats'
