@@ -1,0 +1,7 @@
+{
+  "files": [
+    {"path": "AGENTS.md", "description": "Generated contributor policy and safety boundary."},
+    {"path": ".github/workflows/repo-check.yml", "description": "Public reusable deterministic check contract."},
+    {"path": "policies/default-branch-ruleset.json", "description": "Exact organization ruleset projection."}
+  ]
+}
