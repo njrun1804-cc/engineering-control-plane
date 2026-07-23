@@ -102,7 +102,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
     @mock.patch.object(MODULE, "_gh")
     @mock.patch.object(MODULE, "parse_dependencies", return_value=[])
     @mock.patch.object(MODULE, "validate", return_value=[])
-    def test_push_candidate_verifies_identity_and_emits_receipt(
+    def test_push_candidate_uses_exact_remote_head_lease_and_emits_receipt(
         self,
         validate: mock.Mock,
         parse_dependencies: mock.Mock,
@@ -178,6 +178,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             git.call_args_list[-1].args[1:],
             (
                 "push",
+                "--force-with-lease=refs/heads/codex/change:" + "a" * 40,
                 "origin",
                 "HEAD:refs/heads/codex/change",
             ),

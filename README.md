@@ -40,7 +40,8 @@ python3 scripts/update_pr_body.py \
 
 The same validator is embedded in CI. The helper closes each declared risk hypothesis, verifies
 exact open or merged dependency heads, keeps the PR draft while it sends and verifies the body and
-candidate, then publishes ready and atomically persists plus emits a `pr_brief_preflight.v2`
+candidate, and safely replaces a rebased head only under an exact expected-remote lease. It then
+publishes ready and atomically persists plus emits a `pr_brief_preflight.v2`
 receipt under the XDG state tree. Repository CI and
 external AI review then run in parallel with the authoritative local gate. Merge remains bound to
 the unchanged exact SHA, current dependency heads, and all required terminal checks.

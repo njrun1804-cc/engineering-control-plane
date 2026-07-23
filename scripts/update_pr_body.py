@@ -314,6 +314,7 @@ def update(
             _git(
                 candidate_worktree,
                 "push",
+                f"--force-with-lease=refs/heads/{branch}:{remote_head}",
                 "origin",
                 f"HEAD:refs/heads/{branch}",
             )

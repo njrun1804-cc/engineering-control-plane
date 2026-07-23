@@ -8,7 +8,8 @@
   `python3 scripts/update_pr_body.py --repo OWNER/REPO --pr NUMBER --body-file BODY.md
   --candidate-worktree "$PWD" --push-candidate`. Use `--create --title TITLE` instead of `--pr`
   for a new ready PR. The command keeps the PR draft until exact verification, accepts exact open
-  or merged dependency heads, and atomically persists plus emits `pr_brief_preflight.v2` under
+  or merged dependency heads, safely replaces rebased heads only under an exact expected-remote
+  lease, and atomically persists plus emits `pr_brief_preflight.v2` under
   `${XDG_STATE_HOME:-$HOME/.local/state}/pr-brief-preflight/`; do not send execution briefs through
   a raw edit path.
 - **Full gate:** the `control-plane` profile validates unit tests, generated mirrors, JSON/YAML,
