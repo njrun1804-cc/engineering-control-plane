@@ -288,7 +288,7 @@ def update(
         "--repo",
         repo,
         "--json",
-        "body,headRefName,headRefOid,isDraft,state,url",
+        "body,headRefName,headRefOid,headRepository,isCrossRepository,isDraft,state,url",
     )
     if pull.get("state") != "OPEN":
         raise BriefValidationError(f"pull request {pull_request} is not open")
@@ -296,6 +296,17 @@ def update(
         raise BriefValidationError(
             f"candidate branch {branch!r} does not match PR head {pull.get('headRefName')!r}"
         )
+    head_repository = pull.get("headRepository")
+    if pull.get("isCrossRepository") is True or (
+        isinstance(head_repository, dict)
+        and head_repository.get("nameWithOwner") != repo
+    ):
+        raise BriefValidationError(
+            "cross-repository PR heads are not supported by --push-candidate"
+        )
+    prior_body = pull.get("body")
+    if not isinstance(prior_body, str):
+        raise BriefValidationError("GitHub PR body is not a string")
     _git(candidate_worktree, "fetch", "origin", branch)
     remote_head = str(_git(candidate_worktree, "rev-parse", f"origin/{branch}"))
     if remote_head != pull.get("headRefOid"):
@@ -318,8 +329,25 @@ def update(
                 "origin",
                 f"HEAD:refs/heads/{branch}",
             )
-        except CommandError:
+        except CommandError as push_error:
+            rollback_error: CommandError | None = None
+            try:
+                _gh(
+                    "pr",
+                    "edit",
+                    str(pull_request),
+                    "--repo",
+                    repo,
+                    "--body",
+                    prior_body,
+                )
+            except CommandError as exc:
+                rollback_error = exc
             _quarantine_pull_request(repo=repo, pull_request=pull_request)
+            if rollback_error is not None:
+                raise CommandError(
+                    f"{push_error}; PR body rollback failed: {rollback_error}"
+                ) from push_error
             raise
         observed = _observe_pushed_candidate(
             repo=repo,

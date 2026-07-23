@@ -45,6 +45,8 @@ publishes ready and atomically persists plus emits a `pr_brief_preflight.v2`
 receipt under the XDG state tree. Repository CI and
 external AI review then run in parallel with the authoritative local gate. Merge remains bound to
 the unchanged exact SHA, current dependency heads, and all required terminal checks.
+Candidate pushes are limited to same-repository PR heads. A rejected lease restores the prior body
+and leaves the PR quarantined as a draft; rollback failure is explicit and never emits a receipt.
 
 The fleet standard is capability-based: each repository documents its real bootstrap, targeted
 verification, full gate, safe smoke or exercise path, fixtures/state, environment/services,
