@@ -3,5 +3,39 @@
   "commentTypes": ["logic", "syntax"],
   "triggerOnUpdates": true,
   "triggerOnDrafts": false,
-  "shouldUpdateDescription": false
+  "shouldUpdateDescription": false,
+  "statusCheck": true,
+  "fixWithAI": false,
+  "autoApprove": {"enabled": false},
+  "summarySection": {"included": true, "collapsible": true, "defaultOpen": true},
+  "issuesTableSection": {"included": true, "collapsible": false, "defaultOpen": true},
+  "confidenceScoreSection": {"included": true, "collapsible": false, "defaultOpen": true},
+  "sequenceDiagramSection": {"included": false},
+  "rules": [
+    {
+      "id": "artifact-identity",
+      "rule": "Validated, copied, transported, signed, or restored bytes must share one explicit identity.",
+      "severity": "high"
+    },
+    {
+      "id": "readiness-proof",
+      "rule": "Loaded, present, or started is not proof of health; require the documented observable readiness check.",
+      "severity": "high"
+    },
+    {
+      "id": "failure-path-truth",
+      "rule": "Exceptions and partial failures must reach cleanup, status, notification, and receipt paths without reporting success.",
+      "severity": "high"
+    },
+    {
+      "id": "clean-checkout-repro",
+      "rule": "Locked setup and validation must work in a clean checkout without developer-local paths or ambient dependencies.",
+      "severity": "high"
+    },
+    {
+      "id": "population-completeness",
+      "rule": "Scans, reconciliations, and authority checks must not silently omit eligible branches, files, records, or states.",
+      "severity": "high"
+    }
+  ]
 }
