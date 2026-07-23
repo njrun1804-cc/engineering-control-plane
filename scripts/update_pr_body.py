@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -38,6 +39,12 @@ class BriefValidationError(ValueError):
 
 class CommandError(RuntimeError):
     """A required Git or GitHub operation failed."""
+
+
+def _canonical_repo_url(repo: str) -> str:
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo) is None:
+        raise BriefValidationError("repository must be OWNER/REPO")
+    return f"https://github.com/{repo}.git"
 
 
 def _command(
@@ -307,11 +314,16 @@ def update(
     prior_body = pull.get("body")
     if not isinstance(prior_body, str):
         raise BriefValidationError("GitHub PR body is not a string")
-    _git(candidate_worktree, "fetch", "origin", branch)
-    remote_head = str(_git(candidate_worktree, "rev-parse", f"origin/{branch}"))
+    # Never let an ambient `origin` choose the mutation target. A worktree can have
+    # the right branch name and object while its remote points at an unrelated
+    # repository. Fetch and push through the canonical URL derived from the
+    # already-validated PR repository identity.
+    push_remote = _canonical_repo_url(repo)
+    _git(candidate_worktree, "fetch", push_remote, branch)
+    remote_head = str(_git(candidate_worktree, "rev-parse", "FETCH_HEAD"))
     if remote_head != pull.get("headRefOid"):
         raise BriefValidationError(
-            "local remote-tracking head does not match GitHub PR head"
+            "canonical repository branch does not match GitHub PR head"
         )
     if not push_candidate and head_sha != pull.get("headRefOid"):
         raise BriefValidationError(
@@ -326,7 +338,7 @@ def update(
                 candidate_worktree,
                 "push",
                 f"--force-with-lease=refs/heads/{branch}:{remote_head}",
-                "origin",
+                push_remote,
                 f"HEAD:refs/heads/{branch}",
             )
         except CommandError as push_error:
@@ -418,7 +430,12 @@ def create(
         raise CommandError(
             f"candidate branch already has open pull request(s) {numbers}; use --pr"
         )
-    _git(candidate_worktree, "push", "origin", f"HEAD:refs/heads/{branch}")
+    _git(
+        candidate_worktree,
+        "push",
+        _canonical_repo_url(repo),
+        f"HEAD:refs/heads/{branch}",
+    )
     try:
         url = _gh(
             "pr",

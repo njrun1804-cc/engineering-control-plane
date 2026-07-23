@@ -179,10 +179,15 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             (
                 "push",
                 "--force-with-lease=refs/heads/codex/change:" + "a" * 40,
-                "origin",
+                "https://github.com/o/r.git",
                 "HEAD:refs/heads/codex/change",
             ),
         )
+        self.assertIn(
+            ("fetch", "https://github.com/o/r.git", "codex/change"),
+            [call.args[1:] for call in git.call_args_list],
+        )
+        self.assertNotIn("origin", [str(arg) for call in git.call_args_list for arg in call.args])
 
     @mock.patch.object(MODULE, "_verify_dependencies")
     @mock.patch.object(MODULE, "_git")
@@ -631,6 +636,14 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                 candidate_worktree=root,
             )
         self.assertEqual(receipt["pull_request"], 7)
+        self.assertIn(
+            (
+                "push",
+                "https://github.com/o/r.git",
+                "HEAD:refs/heads/codex/new",
+            ),
+            [call.args[1:] for call in git.call_args_list],
+        )
         self.assertEqual(
             gh.call_args_list[1].args,
             (
@@ -727,7 +740,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                     candidate_worktree=root,
                 )
         self.assertNotIn(
-            ("push", "origin", "HEAD:refs/heads/codex/new"),
+            ("push", "https://github.com/o/r.git", "HEAD:refs/heads/codex/new"),
             [call.args[1:] for call in git.call_args_list],
         )
 
