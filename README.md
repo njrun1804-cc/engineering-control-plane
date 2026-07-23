@@ -34,12 +34,16 @@ Before editing a PR, use the fail-closed local send path:
 
 ```bash
 python3 scripts/update_pr_body.py \
-  --repo OWNER/REPOSITORY --pr NUMBER --body-file /path/to/body.md
+  --repo OWNER/REPOSITORY --pr NUMBER --body-file /path/to/body.md \
+  --candidate-worktree "$PWD" --push-candidate
 ```
 
-The same validator is embedded in CI. After focused proof and this preflight, push the candidate
-head immediately so repository CI and external AI review run in parallel with the authoritative
-local gate. Merge remains bound to the unchanged exact SHA and all required terminal checks.
+The same validator is embedded in CI. The helper closes each declared risk hypothesis, verifies
+exact open or merged dependency heads, keeps the PR draft while it sends and verifies the body and
+candidate, then publishes ready and atomically persists plus emits a `pr_brief_preflight.v2`
+receipt under the XDG state tree. Repository CI and
+external AI review then run in parallel with the authoritative local gate. Merge remains bound to
+the unchanged exact SHA, current dependency heads, and all required terminal checks.
 
 The fleet standard is capability-based: each repository documents its real bootstrap, targeted
 verification, full gate, safe smoke or exercise path, fixtures/state, environment/services,
