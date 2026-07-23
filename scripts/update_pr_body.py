@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import tempfile
 import time
@@ -38,6 +39,12 @@ class BriefValidationError(ValueError):
 
 class CommandError(RuntimeError):
     """A required Git or GitHub operation failed."""
+
+
+def _canonical_repo_url(repo: str) -> str:
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo) is None:
+        raise BriefValidationError("repository must be OWNER/REPO")
+    return f"https://github.com/{repo}.git"
 
 
 def _command(
@@ -288,7 +295,7 @@ def update(
         "--repo",
         repo,
         "--json",
-        "body,headRefName,headRefOid,isDraft,state,url",
+        "body,headRefName,headRefOid,headRepository,isCrossRepository,isDraft,state,url",
     )
     if pull.get("state") != "OPEN":
         raise BriefValidationError(f"pull request {pull_request} is not open")
@@ -296,11 +303,27 @@ def update(
         raise BriefValidationError(
             f"candidate branch {branch!r} does not match PR head {pull.get('headRefName')!r}"
         )
-    _git(candidate_worktree, "fetch", "origin", branch)
-    remote_head = str(_git(candidate_worktree, "rev-parse", f"origin/{branch}"))
+    head_repository = pull.get("headRepository")
+    if pull.get("isCrossRepository") is True or (
+        isinstance(head_repository, dict)
+        and head_repository.get("nameWithOwner") != repo
+    ):
+        raise BriefValidationError(
+            "cross-repository PR heads are not supported by --push-candidate"
+        )
+    prior_body = pull.get("body")
+    if not isinstance(prior_body, str):
+        raise BriefValidationError("GitHub PR body is not a string")
+    # Never let an ambient `origin` choose the mutation target. A worktree can have
+    # the right branch name and object while its remote points at an unrelated
+    # repository. Fetch and push through the canonical URL derived from the
+    # already-validated PR repository identity.
+    push_remote = _canonical_repo_url(repo)
+    _git(candidate_worktree, "fetch", push_remote, branch)
+    remote_head = str(_git(candidate_worktree, "rev-parse", "FETCH_HEAD"))
     if remote_head != pull.get("headRefOid"):
         raise BriefValidationError(
-            "local remote-tracking head does not match GitHub PR head"
+            "canonical repository branch does not match GitHub PR head"
         )
     if not push_candidate and head_sha != pull.get("headRefOid"):
         raise BriefValidationError(
@@ -314,11 +337,29 @@ def update(
             _git(
                 candidate_worktree,
                 "push",
-                "origin",
+                f"--force-with-lease=refs/heads/{branch}:{remote_head}",
+                push_remote,
                 f"HEAD:refs/heads/{branch}",
             )
-        except CommandError:
+        except CommandError as push_error:
+            rollback_error: CommandError | None = None
+            try:
+                _gh(
+                    "pr",
+                    "edit",
+                    str(pull_request),
+                    "--repo",
+                    repo,
+                    "--body",
+                    prior_body,
+                )
+            except CommandError as exc:
+                rollback_error = exc
             _quarantine_pull_request(repo=repo, pull_request=pull_request)
+            if rollback_error is not None:
+                raise CommandError(
+                    f"{push_error}; PR body rollback failed: {rollback_error}"
+                ) from push_error
             raise
         observed = _observe_pushed_candidate(
             repo=repo,
@@ -389,7 +430,12 @@ def create(
         raise CommandError(
             f"candidate branch already has open pull request(s) {numbers}; use --pr"
         )
-    _git(candidate_worktree, "push", "origin", f"HEAD:refs/heads/{branch}")
+    _git(
+        candidate_worktree,
+        "push",
+        _canonical_repo_url(repo),
+        f"HEAD:refs/heads/{branch}",
+    )
     try:
         url = _gh(
             "pr",

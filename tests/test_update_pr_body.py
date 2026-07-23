@@ -102,7 +102,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
     @mock.patch.object(MODULE, "_gh")
     @mock.patch.object(MODULE, "parse_dependencies", return_value=[])
     @mock.patch.object(MODULE, "validate", return_value=[])
-    def test_push_candidate_verifies_identity_and_emits_receipt(
+    def test_push_candidate_uses_exact_remote_head_lease_and_emits_receipt(
         self,
         validate: mock.Mock,
         parse_dependencies: mock.Mock,
@@ -178,10 +178,16 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             git.call_args_list[-1].args[1:],
             (
                 "push",
-                "origin",
+                "--force-with-lease=refs/heads/codex/change:" + "a" * 40,
+                "https://github.com/o/r.git",
                 "HEAD:refs/heads/codex/change",
             ),
         )
+        self.assertIn(
+            ("fetch", "https://github.com/o/r.git", "codex/change"),
+            [call.args[1:] for call in git.call_args_list],
+        )
+        self.assertNotIn("origin", [str(arg) for call in git.call_args_list for arg in call.args])
 
     @mock.patch.object(MODULE, "_verify_dependencies")
     @mock.patch.object(MODULE, "_git")
@@ -281,6 +287,115 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             (root / "docs").mkdir()
             (root / "docs" / "agent-ready.md").write_text("safe")
             with self.assertRaises(MODULE.CommandError):
+                MODULE.update(
+                    repo="o/r",
+                    pull_request=1,
+                    body_file=body,
+                    candidate_worktree=root,
+                    push_candidate=True,
+                )
+        self.assertEqual(
+            gh.call_args_list[-1].args,
+            ("pr", "ready", "1", "--repo", "o/r", "--undo"),
+        )
+        self.assertIn(
+            mock.call("pr", "edit", "1", "--repo", "o/r", "--body", "old"),
+            gh.call_args_list,
+        )
+
+    @mock.patch.object(MODULE, "_verify_dependencies")
+    @mock.patch.object(MODULE, "_git")
+    @mock.patch.object(MODULE, "_gh_json")
+    @mock.patch.object(MODULE, "_gh")
+    @mock.patch.object(MODULE, "parse_dependencies", return_value=[])
+    @mock.patch.object(MODULE, "validate", return_value=[])
+    def test_push_candidate_rejects_cross_repository_pr_before_fetch_or_edit(
+        self,
+        validate: mock.Mock,
+        parse_dependencies: mock.Mock,
+        gh: mock.Mock,
+        gh_json: mock.Mock,
+        git: mock.Mock,
+        verify_dependencies: mock.Mock,
+    ) -> None:
+        gh_json.return_value = {
+            "body": "old",
+            "headRefName": "codex/change",
+            "headRefOid": "a" * 40,
+            "headRepository": {"nameWithOwner": "fork-owner/r"},
+            "isCrossRepository": True,
+            "isDraft": False,
+            "state": "OPEN",
+            "url": "https://github.com/o/r/pull/1",
+        }
+        git.side_effect = ["b" * 40, "codex/change", "src/main.py"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            body = root / "body.md"
+            body.write_text("valid")
+            (root / "docs").mkdir()
+            (root / "docs" / "agent-ready.md").write_text("safe")
+            with self.assertRaisesRegex(
+                MODULE.BriefValidationError, "cross-repository"
+            ):
+                MODULE.update(
+                    repo="o/r",
+                    pull_request=1,
+                    body_file=body,
+                    candidate_worktree=root,
+                    push_candidate=True,
+                )
+        self.assertEqual(len(git.call_args_list), 3)
+        gh.assert_not_called()
+
+    @mock.patch.object(MODULE, "_verify_dependencies")
+    @mock.patch.object(MODULE, "_git")
+    @mock.patch.object(MODULE, "_gh_json")
+    @mock.patch.object(MODULE, "_gh")
+    @mock.patch.object(MODULE, "parse_dependencies", return_value=[])
+    @mock.patch.object(MODULE, "validate", return_value=[])
+    def test_push_and_body_rollback_failure_remains_quarantined_and_explicit(
+        self,
+        validate: mock.Mock,
+        parse_dependencies: mock.Mock,
+        gh: mock.Mock,
+        gh_json: mock.Mock,
+        git: mock.Mock,
+        verify_dependencies: mock.Mock,
+    ) -> None:
+        gh_json.return_value = {
+            "body": "old",
+            "headRefName": "codex/change",
+            "headRefOid": "a" * 40,
+            "isDraft": False,
+            "state": "OPEN",
+            "url": "https://github.com/o/r/pull/1",
+        }
+        git.side_effect = [
+            "b" * 40,
+            "codex/change",
+            "src/main.py",
+            None,
+            "a" * 40,
+            MODULE.CommandError("lease rejected"),
+        ]
+
+        def github(*args: str) -> str:
+            if args[-2:] == ("--body", "old"):
+                raise MODULE.CommandError("rollback rejected")
+            return ""
+
+        gh.side_effect = github
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            body = root / "body.md"
+            body.write_text("valid")
+            (root / "docs").mkdir()
+            (root / "docs" / "agent-ready.md").write_text("safe")
+            with self.assertRaisesRegex(
+                MODULE.CommandError,
+                "lease rejected; PR body rollback failed: rollback rejected",
+            ):
                 MODULE.update(
                     repo="o/r",
                     pull_request=1,
@@ -521,6 +636,14 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                 candidate_worktree=root,
             )
         self.assertEqual(receipt["pull_request"], 7)
+        self.assertIn(
+            (
+                "push",
+                "https://github.com/o/r.git",
+                "HEAD:refs/heads/codex/new",
+            ),
+            [call.args[1:] for call in git.call_args_list],
+        )
         self.assertEqual(
             gh.call_args_list[1].args,
             (
@@ -617,7 +740,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                     candidate_worktree=root,
                 )
         self.assertNotIn(
-            ("push", "origin", "HEAD:refs/heads/codex/new"),
+            ("push", "https://github.com/o/r.git", "HEAD:refs/heads/codex/new"),
             [call.args[1:] for call in git.call_args_list],
         )
 
