@@ -115,16 +115,17 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
             "empty required section: ## Operational changes", MODULE.validate(body)
         )
 
-    def test_event_payload_preserves_multiline_body(self) -> None:
+    def test_json_transport_preserves_multiline_body_when_called_event_lacks_pr(
+        self,
+    ) -> None:
         with tempfile.TemporaryDirectory() as raw_dir:
             event = Path(raw_dir) / "event.json"
-            event.write_text(
-                json.dumps({"pull_request": {"body": VALID_BODY}}), encoding="utf-8"
-            )
+            event.write_text(json.dumps({"event": "workflow_call"}), encoding="utf-8")
             with mock.patch.dict(
                 os.environ,
                 {
                     "GITHUB_EVENT_PATH": str(event),
+                    "PR_BODY_JSON": json.dumps(VALID_BODY),
                     "PR_BODY": VALID_BODY.replace("\n", r"\n"),
                 },
                 clear=False,

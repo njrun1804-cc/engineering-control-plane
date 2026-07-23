@@ -36,7 +36,7 @@ jobs:
       - name: Validate agent-ready PR execution brief
         if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
         env:
-          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BODY_JSON: ${{ toJSON(github.event.pull_request.body) }}
         run: |
           # BEGIN GENERATED PR BRIEF VALIDATOR
           python3 - <<'PY'
@@ -143,12 +143,17 @@ jobs:
 
 
           def _pull_request_body() -> str:
-              """Read the event payload directly so multiline Markdown survives workflow transport."""
+              """Read a multiline-safe PR body from the event or the workflow's JSON transport."""
               if event_path := os.environ.get("GITHUB_EVENT_PATH"):
                   payload = json.loads(Path(event_path).read_text(encoding="utf-8"))
                   pull_request = payload.get("pull_request")
                   if isinstance(pull_request, dict) and isinstance(pull_request.get("body"), str):
                       return pull_request["body"]
+              if encoded_body := os.environ.get("PR_BODY_JSON"):
+                  body = json.loads(encoded_body)
+                  if not isinstance(body, str):
+                      raise ValueError("PR_BODY_JSON must decode to a string")
+                  return body
               return os.environ.get("PR_BODY", "")
 
 

@@ -101,12 +101,17 @@ def validate(body: str) -> list[str]:
 
 
 def _pull_request_body() -> str:
-    """Read the event payload directly so multiline Markdown survives workflow transport."""
+    """Read a multiline-safe PR body from the event or the workflow's JSON transport."""
     if event_path := os.environ.get("GITHUB_EVENT_PATH"):
         payload = json.loads(Path(event_path).read_text(encoding="utf-8"))
         pull_request = payload.get("pull_request")
         if isinstance(pull_request, dict) and isinstance(pull_request.get("body"), str):
             return pull_request["body"]
+    if encoded_body := os.environ.get("PR_BODY_JSON"):
+        body = json.loads(encoded_body)
+        if not isinstance(body, str):
+            raise ValueError("PR_BODY_JSON must decode to a string")
+        return body
     return os.environ.get("PR_BODY", "")
 
 
