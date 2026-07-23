@@ -147,6 +147,59 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
     @mock.patch.object(MODULE, "_gh")
     @mock.patch.object(MODULE, "parse_dependencies", return_value=[])
     @mock.patch.object(MODULE, "validate", return_value=[])
+    def test_push_candidate_waits_for_github_head_propagation(
+        self,
+        validate: mock.Mock,
+        parse_dependencies: mock.Mock,
+        gh: mock.Mock,
+        gh_json: mock.Mock,
+        git: mock.Mock,
+        verify_dependencies: mock.Mock,
+    ) -> None:
+        initial = {
+            "body": "old",
+            "headRefName": "codex/change",
+            "headRefOid": "a" * 40,
+            "state": "OPEN",
+            "url": "https://github.com/o/r/pull/1",
+        }
+        propagated = {
+            **initial,
+            "body": "valid",
+            "headRefOid": "b" * 40,
+        }
+        gh_json.side_effect = [initial, {**initial, "body": "valid"}, propagated]
+        git.side_effect = [
+            "b" * 40,
+            "codex/change",
+            "src/main.py",
+            None,
+            "a" * 40,
+            None,
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            body = root / "body.md"
+            body.write_text("valid")
+            (root / "docs").mkdir()
+            (root / "docs" / "agent-ready.md").write_text("safe")
+            with mock.patch.object(MODULE.time, "sleep") as sleep:
+                receipt = MODULE.update(
+                    repo="o/r",
+                    pull_request=1,
+                    body_file=body,
+                    candidate_worktree=root,
+                    push_candidate=True,
+                )
+        self.assertEqual(receipt["head_sha"], "b" * 40)
+        sleep.assert_called_once_with(1)
+
+    @mock.patch.object(MODULE, "_verify_dependencies")
+    @mock.patch.object(MODULE, "_git")
+    @mock.patch.object(MODULE, "_gh_json")
+    @mock.patch.object(MODULE, "_gh")
+    @mock.patch.object(MODULE, "parse_dependencies", return_value=[])
+    @mock.patch.object(MODULE, "validate", return_value=[])
     def test_push_failure_restores_previous_body(
         self,
         validate: mock.Mock,
@@ -278,6 +331,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                 )
         gh.assert_not_called()
 
+    @mock.patch.object(MODULE.time, "sleep")
     @mock.patch.object(MODULE, "_verify_dependencies")
     @mock.patch.object(MODULE, "_git")
     @mock.patch.object(MODULE, "_gh_json")
@@ -292,23 +346,21 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
         gh_json: mock.Mock,
         git: mock.Mock,
         verify_dependencies: mock.Mock,
+        sleep: mock.Mock,
     ) -> None:
-        gh_json.side_effect = [
-            {
-                "body": "old",
-                "headRefName": "codex/change",
-                "headRefOid": "a" * 40,
-                "state": "OPEN",
-                "url": "https://github.com/o/r/pull/1",
-            },
-            {
-                "body": "valid",
-                "headRefName": "codex/change",
-                "headRefOid": "c" * 40,
-                "state": "OPEN",
-                "url": "https://github.com/o/r/pull/1",
-            },
-        ]
+        initial = {
+            "body": "old",
+            "headRefName": "codex/change",
+            "headRefOid": "a" * 40,
+            "state": "OPEN",
+            "url": "https://github.com/o/r/pull/1",
+        }
+        divergent = {
+            **initial,
+            "body": "valid",
+            "headRefOid": "c" * 40,
+        }
+        gh_json.side_effect = [initial, *([divergent] * 6)]
         git.side_effect = [
             "b" * 40,
             "codex/change",
@@ -332,6 +384,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                     push_candidate=True,
                 )
         self.assertEqual(gh.call_args_list[-1].args[-1], "old")
+        self.assertEqual(sleep.call_count, 5)
 
     def test_main_prints_json_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

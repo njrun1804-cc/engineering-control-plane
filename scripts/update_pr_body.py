@@ -8,6 +8,7 @@ import hashlib
 import importlib.util
 import json
 import subprocess
+import time
 from pathlib import Path
 from types import ModuleType
 
@@ -87,6 +88,31 @@ def _verify_dependencies(dependencies: list[dict[str, object]]) -> None:
             raise BriefValidationError(f"dependency {repository}#{number} is not open")
         if observed.get("headRefOid") != expected:
             raise BriefValidationError(f"dependency {repository}#{number} head drifted")
+
+
+def _observe_pushed_candidate(
+    *,
+    repo: str,
+    pull_request: int,
+    head_sha: str,
+    attempts: int = 6,
+) -> dict[str, object]:
+    observed: dict[str, object] = {}
+    for attempt in range(attempts):
+        observed = _gh_json(
+            "pr",
+            "view",
+            str(pull_request),
+            "--repo",
+            repo,
+            "--json",
+            "body,headRefName,headRefOid,state,url",
+        )
+        if observed.get("headRefOid") == head_sha:
+            return observed
+        if attempt + 1 < attempts:
+            time.sleep(1)
+    return observed
 
 
 def _receipt(
@@ -221,14 +247,10 @@ def update(
                 previous_body,
             )
             raise
-        observed = _gh_json(
-            "pr",
-            "view",
-            str(pull_request),
-            "--repo",
-            repo,
-            "--json",
-            "body,headRefName,headRefOid,state,url",
+        observed = _observe_pushed_candidate(
+            repo=repo,
+            pull_request=pull_request,
+            head_sha=head_sha,
         )
         if observed.get("headRefOid") != head_sha:
             if observed.get("body") == body:
