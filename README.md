@@ -30,6 +30,17 @@ setup, fixtures, targeted commands, and the canonical gate remain in each reposi
 being replaced with a second generic command layer. Validation rejects missing, duplicated, and
 empty sections after stripping template comments and label-only scaffolding.
 
+Before editing a PR, use the fail-closed local send path:
+
+```bash
+python3 scripts/update_pr_body.py \
+  --repo OWNER/REPOSITORY --pr NUMBER --body-file /path/to/body.md
+```
+
+The same validator is embedded in CI. After focused proof and this preflight, push the candidate
+head immediately so repository CI and external AI review run in parallel with the authoritative
+local gate. Merge remains bound to the unchanged exact SHA and all required terminal checks.
+
 The fleet standard is capability-based: each repository documents its real bootstrap, targeted
 verification, full gate, safe smoke or exercise path, fixtures/state, environment/services,
 resource and mutation boundaries, and architecture invariants. A repository may explicitly mark a
