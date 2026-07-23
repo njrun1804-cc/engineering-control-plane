@@ -275,6 +275,14 @@ Pre-push result: pass: fourth passed.
             ):
                 self.assertEqual(MODULE.main(["--body-file", str(body)]), 2)
 
+    def test_workflows_include_previous_paths_for_rename_classification(self) -> None:
+        for path in (
+            ROOT / ".github" / "workflows" / "repo-check.yml",
+            ROOT / ".github" / "workflows" / "private-repo-check.yml",
+        ):
+            workflow = path.read_text(encoding="utf-8")
+            self.assertIn(".previous_filename // empty", workflow)
+
 
 if __name__ == "__main__":
     unittest.main()

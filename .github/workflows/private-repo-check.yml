@@ -45,7 +45,7 @@ jobs:
           PR_CHANGED_FILES_JSON="$(
             gh api --paginate \
               "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" \
-              --jq '.[].filename' |
+              --jq '.[] | .filename, (.previous_filename // empty)' |
               python3 -c 'import json, sys; print(json.dumps(sys.stdin.read().splitlines()))'
           )"
           export PR_CHANGED_FILES_JSON
