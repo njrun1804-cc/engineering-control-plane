@@ -4,15 +4,17 @@
   security analysis. No application dependency environment exists.
 - **Targeted verification:** `python3 -m unittest discover -s tests -v` and
   `python3 scripts/embed_pr_validator.py`.
-- **PR-body preflight:** validate, send, and push an existing candidate through
-  `python3 scripts/update_pr_body.py --repo OWNER/REPO --pr NUMBER --body-file BODY.md
-  --candidate-worktree "$PWD" --push-candidate`. Use `--create --title TITLE` instead of `--pr`
-  for a new ready PR. The command keeps the PR draft until exact verification, accepts exact open
-  or merged dependency heads, safely replaces rebased heads only under an exact expected-remote
-  lease, rejects cross-repository push targets, restores the prior body after push failure, and
-  atomically persists plus emits `pr_brief_preflight.v2` under
-  `${XDG_STATE_HOME:-$HOME/.local/state}/pr-brief-preflight/`; do not send execution briefs through
-  a raw edit path.
+- **PR-body preflight:** ordinary CC fleet callers use
+  `zion pr send --repo OWNER/REPO --pr NUMBER --body-file BODY.md --worktree "$PWD"`;
+  `--create --title TITLE` creates a ready PR. Zion resolves this repository's validator and
+  sender from the exact commit pinned in workspace policy. Within ECP development or bootstrap,
+  the backend command remains `python3 scripts/update_pr_body.py --repo OWNER/REPO --pr NUMBER
+  --body-file BODY.md --candidate-worktree "$PWD" --push-candidate`. Both paths keep the PR draft
+  until exact verification, accept exact open or merged dependency heads, bind rebased replacement
+  to the canonical repository and exact expected-remote lease, restore the prior body after push
+  failure, and atomically persist plus emit `pr_brief_preflight.v2` under
+  `${XDG_STATE_HOME:-$HOME/.local/state}/pr-brief-preflight/`. Cross-repository PR heads are
+  rejected; never use a raw edit path.
 - **Full gate:** the `control-plane` profile validates unit tests, generated mirrors, JSON/YAML,
   action pins, and zizmor in `.github/workflows/repo-check.yml`.
 - **Safe exercise:** `python3 -m unittest discover -s tests -v`, generated-file checks, JSON/YAML

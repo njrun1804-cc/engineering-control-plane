@@ -30,7 +30,25 @@ setup, fixtures, targeted commands, and the canonical gate remain in each reposi
 being replaced with a second generic command layer. Validation rejects missing, duplicated, and
 empty sections after stripping template comments and label-only scaffolding.
 
-Before editing a PR, use the fail-closed local send path:
+## Operator boundary
+
+This repository is the independent, public protocol backend: it owns reusable GitHub workflows,
+the brief validator, the exact-byte sender, and their tests. Zion is the local operator frontend
+for the CC workspace. That split keeps public workflow availability and validation independent of
+any private application repository without making agents remember this checkout's layout.
+
+For normal fleet work, validate or send through Zion:
+
+```bash
+zion pr validate --repo OWNER/REPOSITORY --pr NUMBER --body-file /path/to/body.md \
+  --worktree "$PWD"
+zion pr send --repo OWNER/REPOSITORY --pr NUMBER --body-file /path/to/body.md \
+  --worktree "$PWD"
+```
+
+Zion downloads the validator and sender from the exact ECP commit pinned in workspace policy; it
+does not trust an ambient ECP checkout. ECP's direct helper remains the bootstrap, recovery, and
+control-plane-development interface:
 
 ```bash
 python3 scripts/update_pr_body.py \
@@ -38,7 +56,7 @@ python3 scripts/update_pr_body.py \
   --candidate-worktree "$PWD" --push-candidate
 ```
 
-The same validator is embedded in CI. The helper closes each declared risk hypothesis, verifies
+The same validator is embedded in CI. The backend closes each declared risk hypothesis, verifies
 exact open or merged dependency heads, keeps the PR draft while it sends and verifies the body and
 candidate, and safely replaces a rebased head only under an exact expected-remote lease. It then
 publishes ready and atomically persists plus emits a `pr_brief_preflight.v2`
