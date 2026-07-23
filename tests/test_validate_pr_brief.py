@@ -133,6 +133,21 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
                 self.assertEqual(MODULE._pull_request_body(), VALID_BODY)
                 self.assertEqual(MODULE.validate(MODULE._pull_request_body()), [])
 
+    def test_canonical_event_body_never_gains_structure(self) -> None:
+        one_line = VALID_BODY.replace("\n", r"\n")
+        with tempfile.TemporaryDirectory() as raw_dir:
+            event = Path(raw_dir) / "event.json"
+            event.write_text(
+                json.dumps({"pull_request": {"body": one_line}}), encoding="utf-8"
+            )
+            with mock.patch.dict(
+                os.environ, {"GITHUB_EVENT_PATH": str(event)}, clear=False
+            ):
+                self.assertEqual(MODULE._pull_request_body(), one_line)
+                self.assertIn(
+                    "missing required heading: ## Intent", MODULE.validate(one_line)
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -156,7 +156,7 @@ jobs:
                   payload = json.loads(Path(event_path).read_text(encoding="utf-8"))
                   pull_request = payload.get("pull_request")
                   if isinstance(pull_request, dict) and isinstance(pull_request.get("body"), str):
-                      return _normalize_transport_newlines(pull_request["body"])
+                      return pull_request["body"]
               if encoded_body := os.environ.get("PR_BODY_JSON"):
                   body = json.loads(encoded_body)
                   if not isinstance(body, str):
