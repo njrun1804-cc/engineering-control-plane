@@ -92,6 +92,19 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
         ).replace("## TEMP", "## Behavioral contract", 1)
         self.assertEqual(MODULE.validate(body), ["required headings are out of order"])
 
+    def test_blank_operational_labels_fail(self) -> None:
+        body = VALID_BODY.replace(
+            "- Config or environment variables: none\n"
+            "- Schema or data migration: none\n"
+            "- Permissions or secrets: none\n"
+            "- Rollout or rollback considerations: callers pin the corrected release.",
+            "- Config or environment variables:\n"
+            "- Schema or data migration:\n"
+            "- Permissions or secrets:\n"
+            "- Rollout or rollback considerations:",
+        )
+        self.assertIn("empty required section: ## Operational changes", MODULE.validate(body))
+
 
 if __name__ == "__main__":
     unittest.main()

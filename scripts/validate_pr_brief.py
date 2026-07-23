@@ -28,6 +28,12 @@ SCAFFOLD_LINES = {
         "- Existing validation intentionally not run:",
         "- Screenshots or traces:",
     },
+    "## Operational changes": {
+        "- Config or environment variables:",
+        "- Schema or data migration:",
+        "- Permissions or secrets:",
+        "- Rollout or rollback considerations:",
+    },
 }
 
 PLACEHOLDER_LINES = {"-", "*", "+", "1.", "1)"}
