@@ -306,6 +306,13 @@ def create(
         "body,headRefName,headRefOid,state,url",
     )
     if observed.get("headRefOid") != head_sha or observed.get("body") != body:
+        try:
+            pull_request = int(url.rstrip("/").rsplit("/", maxsplit=1)[-1])
+        except ValueError as exc:
+            raise CommandError(
+                "could not quarantine mismatched created pull request"
+            ) from exc
+        _quarantine_pull_request(repo=repo, pull_request=pull_request)
         raise CommandError("created pull request does not match validated candidate")
     try:
         pull_request = int(str(observed["url"]).rstrip("/").rsplit("/", maxsplit=1)[-1])

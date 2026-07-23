@@ -494,6 +494,48 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             ),
         )
 
+    @mock.patch.object(MODULE, "_verify_dependencies")
+    @mock.patch.object(MODULE, "_git")
+    @mock.patch.object(MODULE, "_gh_json")
+    @mock.patch.object(MODULE, "_gh")
+    @mock.patch.object(MODULE, "parse_dependencies", return_value=[])
+    @mock.patch.object(MODULE, "validate", return_value=[])
+    def test_create_mismatch_quarantines_new_pr_without_receipt(
+        self,
+        validate: mock.Mock,
+        parse_dependencies: mock.Mock,
+        gh: mock.Mock,
+        gh_json: mock.Mock,
+        git: mock.Mock,
+        verify_dependencies: mock.Mock,
+    ) -> None:
+        git.side_effect = ["c" * 40, "codex/new", "src/main.py", None]
+        gh.return_value = "https://github.com/o/r/pull/7"
+        gh_json.return_value = {
+            "body": "concurrent body",
+            "headRefName": "codex/new",
+            "headRefOid": "d" * 40,
+            "state": "OPEN",
+            "url": "https://github.com/o/r/pull/7",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            body = root / "body.md"
+            body.write_text("valid")
+            (root / "docs").mkdir()
+            (root / "docs" / "agent-ready.md").write_text("safe")
+            with self.assertRaisesRegex(MODULE.CommandError, "does not match"):
+                MODULE.create(
+                    repo="o/r",
+                    title="Ready candidate",
+                    body_file=body,
+                    candidate_worktree=root,
+                )
+        self.assertEqual(
+            gh.call_args_list[-1].args,
+            ("pr", "ready", "7", "--repo", "o/r", "--undo"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
