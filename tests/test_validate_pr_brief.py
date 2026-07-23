@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -104,6 +107,19 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
             "- Rollout or rollback considerations:",
         )
         self.assertIn("empty required section: ## Operational changes", MODULE.validate(body))
+
+    def test_body_file_preflight_passes_without_environment_state(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.md"
+            body.write_text(VALID_BODY)
+            with mock.patch.dict(os.environ, {"PR_BODY": ""}):
+                self.assertEqual(MODULE.main(["--body-file", str(body)]), 0)
+
+    def test_body_file_preflight_fails_before_send(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.md"
+            body.write_text("## Intent\n")
+            self.assertEqual(MODULE.main(["--body-file", str(body)]), 2)
 
 
 if __name__ == "__main__":
