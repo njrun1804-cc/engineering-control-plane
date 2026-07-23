@@ -37,22 +37,7 @@ jobs:
         if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          required=(
-            "## Intent"
-            "## Behavioral contract"
-            "## Impact surface"
-            "## Risk hypotheses"
-            "## Validation path"
-            "## Evidence"
-            "## Operational changes"
-          )
-          for heading in "${required[@]}"; do
-            if ! grep -Fqx "$heading" <<<"$PR_BODY"; then
-              echo "Missing required PR execution-brief heading: $heading" >&2
-              exit 2
-            fi
-          done
+        run: python3 scripts/validate_pr_brief.py
 
       - name: Set up uv and Python
         if: inputs.profile != 'control-plane'
@@ -206,6 +191,7 @@ jobs:
       - name: Validate control-plane JSON and YAML
         if: inputs.profile == 'control-plane'
         run: |
+          python3 -m unittest discover -s tests -v
           python3 scripts/mirror_agents.py --check
           find . -path ./.git -prune -o -name '*.json' -type f -print0 | xargs -0 -r jq empty
           for file in .github/*.yml .github/workflows/*.yml; do

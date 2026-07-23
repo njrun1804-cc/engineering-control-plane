@@ -27,7 +27,8 @@ Every non-Dependabot pull request must carry the agent-ready execution brief rep
 validation path, evidence, and operational changes. The reusable workflows enforce those stable
 section names so Codex, CI, Greptile, and T-Rex receive the same change contract. Repository-native
 setup, fixtures, targeted commands, and the canonical gate remain in each repository rather than
-being replaced with a second generic command layer.
+being replaced with a second generic command layer. Validation rejects missing, duplicated, and
+empty sections after stripping template comments and label-only scaffolding.
 
 `policies/default-branch-ruleset.json` is the applied organization ruleset source. Retired
 repositories are explicitly excluded. For active repositories it requires a

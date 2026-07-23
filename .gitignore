@@ -1,2 +1,4 @@
 .serena/
 graphify-out/
+__pycache__/
+*.pyc
