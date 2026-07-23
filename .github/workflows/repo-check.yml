@@ -209,7 +209,7 @@ jobs:
               ;;
             lightroom)
               sudo apt-get update -qq
-              sudo apt-get install -y --no-install-recommends lua5.4 liblua5.4-dev luarocks libvips-dev
+              sudo apt-get install -y --no-install-recommends lua5.4 liblua5.4-dev luarocks
               ;;
           esac
 
