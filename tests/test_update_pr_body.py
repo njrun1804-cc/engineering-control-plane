@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
-import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -19,66 +18,56 @@ SPEC.loader.exec_module(MODULE)
 
 class UpdatePullRequestBodyTests(unittest.TestCase):
     @mock.patch.object(MODULE.subprocess, "run")
-    def test_validator_runs_before_github_edit(self, run: mock.Mock) -> None:
+    @mock.patch.object(MODULE, "validate", return_value=[])
+    def test_validated_body_is_sent_in_memory(self, validate: mock.Mock, run: mock.Mock) -> None:
         with tempfile.TemporaryDirectory() as directory:
             body = Path(directory) / "body.md"
             body.write_text("valid")
-            MODULE.update(
-                repo="njrun1804-cc/Zion",
-                pull_request=38,
-                body_file=body,
-            )
+            MODULE.update(repo="njrun1804-cc/Zion", pull_request=38, body_file=body)
 
-        self.assertEqual(run.call_count, 2)
-        validator, github = run.call_args_list
-        validator_command = validator.args[0]
-        github_command = github.args[0]
-        self.assertEqual(validator_command[:3], [MODULE.sys.executable, str(MODULE.VALIDATOR), "--body-file"])
+        validate.assert_called_once_with("valid")
         self.assertEqual(
-            github_command[:-1],
-            ["gh", "pr", "edit", "38", "--repo", "njrun1804-cc/Zion", "--body-file"],
+            run.call_args.args[0],
+            [
+                "gh",
+                "pr",
+                "edit",
+                "38",
+                "--repo",
+                "njrun1804-cc/Zion",
+                "--body",
+                "valid",
+            ],
         )
-        self.assertEqual(validator_command[-1], github_command[-1])
-        self.assertNotEqual(github_command[-1], str(body))
-        self.assertFalse(Path(github_command[-1]).exists())
 
     @mock.patch.object(MODULE.subprocess, "run")
-    def test_failed_preflight_prevents_github_edit(self, run: mock.Mock) -> None:
-        run.side_effect = subprocess.CalledProcessError(2, ["validator"])
+    @mock.patch.object(MODULE, "validate", return_value=["invalid"])
+    def test_failed_preflight_prevents_github_edit(
+        self, validate: mock.Mock, run: mock.Mock
+    ) -> None:
         with tempfile.TemporaryDirectory() as directory:
             body = Path(directory) / "body.md"
             body.write_text("invalid")
-            with self.assertRaises(subprocess.CalledProcessError):
-                MODULE.update(
-                    repo="njrun1804-cc/Zion",
-                    pull_request=38,
-                    body_file=body,
-                )
+            with self.assertRaises(MODULE.BriefValidationError):
+                MODULE.update(repo="njrun1804-cc/Zion", pull_request=38, body_file=body)
 
-        self.assertEqual(run.call_count, 1)
+        validate.assert_called_once_with("invalid")
+        run.assert_not_called()
 
     @mock.patch.object(MODULE.subprocess, "run")
     def test_original_replacement_cannot_change_sent_bytes(self, run: mock.Mock) -> None:
-        sent: list[bytes] = []
         with tempfile.TemporaryDirectory() as directory:
             body = Path(directory) / "body.md"
-            body.write_bytes(b"validated")
+            body.write_text("validated")
 
-            def observe(command: list[str], *, check: bool) -> None:
-                del check
-                if command[1:3] == ["pr", "edit"]:
-                    sent.append(Path(command[-1]).read_bytes())
-                else:
-                    body.write_bytes(b"replaced after validation")
+            def mutate_original(value: str) -> list[str]:
+                body.write_text("replaced after validation")
+                return [] if value == "validated" else ["unexpected"]
 
-            run.side_effect = observe
-            MODULE.update(
-                repo="njrun1804-cc/Zion",
-                pull_request=38,
-                body_file=body,
-            )
+            with mock.patch.object(MODULE, "validate", side_effect=mutate_original):
+                MODULE.update(repo="njrun1804-cc/Zion", pull_request=38, body_file=body)
 
-        self.assertEqual(sent, [b"validated"])
+        self.assertEqual(run.call_args.args[0][-1], "validated")
 
 
 if __name__ == "__main__":
