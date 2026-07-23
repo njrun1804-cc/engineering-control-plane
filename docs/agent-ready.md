@@ -4,10 +4,11 @@
   security analysis. No application dependency environment exists.
 - **Targeted verification:** `python3 -m unittest discover -s tests -v` and
   `python3 scripts/embed_pr_validator.py`.
-- **PR-body preflight:** validate and send through
-  `python3 scripts/update_pr_body.py --repo OWNER/REPO --pr NUMBER --body-file BODY.md`. This runs
-  the exact reusable-workflow validator before `gh pr edit`; do not send execution briefs through
-  a raw edit path.
+- **PR-body preflight:** validate, send, and push an existing candidate through
+  `python3 scripts/update_pr_body.py --repo OWNER/REPO --pr NUMBER --body-file BODY.md
+  --candidate-worktree "$PWD" --push-candidate`. Use `--create --title TITLE` instead of `--pr`
+  for a new ready PR. The command verifies dependency heads and emits an exact-head
+  `pr_brief_preflight.v2`; do not send execution briefs through a raw edit path.
 - **Full gate:** the `control-plane` profile validates unit tests, generated mirrors, JSON/YAML,
   action pins, and zizmor in `.github/workflows/repo-check.yml`.
 - **Safe exercise:** `python3 -m unittest discover -s tests -v`, generated-file checks, JSON/YAML
