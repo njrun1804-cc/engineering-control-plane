@@ -30,6 +30,12 @@ setup, fixtures, targeted commands, and the canonical gate remain in each reposi
 being replaced with a second generic command layer. Validation rejects missing, duplicated, and
 empty sections after stripping template comments and label-only scaffolding.
 
+The fleet standard is capability-based: each repository documents its real bootstrap, targeted
+verification, full gate, safe smoke or exercise path, fixtures/state, environment/services,
+resource and mutation boundaries, and architecture invariants. A repository may explicitly mark a
+capability unsupported or live-only; it must not invent a generic `make` target that hides its real
+toolchain.
+
 `policies/default-branch-ruleset.json` is the applied organization ruleset source. Retired
 repositories are explicitly excluded. For active repositories it requires a
 pull request, the common `repo-check / repo-check` status, current-base testing, resolved

@@ -31,6 +31,12 @@ Setup:
 Exercise:
 1.
 
+Inputs or state:
+-
+
+Edge case:
+-
+
 Expected:
 -
 
