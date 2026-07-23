@@ -115,6 +115,17 @@ def _observe_pushed_candidate(
     return observed
 
 
+def _quarantine_pull_request(*, repo: str, pull_request: int) -> None:
+    _gh(
+        "pr",
+        "ready",
+        str(pull_request),
+        "--repo",
+        repo,
+        "--undo",
+    )
+
+
 def _receipt(
     *,
     repo: str,
@@ -226,7 +237,6 @@ def update(
         raise BriefValidationError(
             "candidate HEAD does not match GitHub PR head; use --push-candidate"
         )
-    previous_body = str(pull.get("body") or "")
     _gh("pr", "edit", str(pull_request), "--repo", repo, "--body", body)
     if push_candidate:
         try:
@@ -237,15 +247,7 @@ def update(
                 f"HEAD:refs/heads/{branch}",
             )
         except CommandError:
-            _gh(
-                "pr",
-                "edit",
-                str(pull_request),
-                "--repo",
-                repo,
-                "--body",
-                previous_body,
-            )
+            _quarantine_pull_request(repo=repo, pull_request=pull_request)
             raise
         observed = _observe_pushed_candidate(
             repo=repo,
@@ -253,16 +255,7 @@ def update(
             head_sha=head_sha,
         )
         if observed.get("headRefOid") != head_sha:
-            if observed.get("body") == body:
-                _gh(
-                    "pr",
-                    "edit",
-                    str(pull_request),
-                    "--repo",
-                    repo,
-                    "--body",
-                    previous_body,
-                )
+            _quarantine_pull_request(repo=repo, pull_request=pull_request)
             raise CommandError("GitHub PR head does not match pushed candidate")
     return _receipt(
         repo=repo,

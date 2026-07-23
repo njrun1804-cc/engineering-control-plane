@@ -200,7 +200,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
     @mock.patch.object(MODULE, "_gh")
     @mock.patch.object(MODULE, "parse_dependencies", return_value=[])
     @mock.patch.object(MODULE, "validate", return_value=[])
-    def test_push_failure_restores_previous_body(
+    def test_push_failure_quarantines_ready_pr_without_overwriting_body(
         self,
         validate: mock.Mock,
         parse_dependencies: mock.Mock,
@@ -238,7 +238,10 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                     candidate_worktree=root,
                     push_candidate=True,
                 )
-        self.assertEqual(gh.call_args_list[-1].args[-1], "old")
+        self.assertEqual(
+            gh.call_args_list[-1].args,
+            ("pr", "ready", "1", "--repo", "o/r", "--undo"),
+        )
 
     @mock.patch.object(MODULE, "_verify_dependencies")
     @mock.patch.object(MODULE, "_git")
@@ -338,7 +341,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
     @mock.patch.object(MODULE, "_gh")
     @mock.patch.object(MODULE, "parse_dependencies", return_value=[])
     @mock.patch.object(MODULE, "validate", return_value=[])
-    def test_post_push_head_divergence_restores_previous_body(
+    def test_post_push_head_divergence_quarantines_without_overwriting_body(
         self,
         validate: mock.Mock,
         parse_dependencies: mock.Mock,
@@ -383,7 +386,10 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                     candidate_worktree=root,
                     push_candidate=True,
                 )
-        self.assertEqual(gh.call_args_list[-1].args[-1], "old")
+        self.assertEqual(
+            gh.call_args_list[-1].args,
+            ("pr", "ready", "1", "--repo", "o/r", "--undo"),
+        )
         self.assertEqual(sleep.call_count, 5)
 
     def test_main_prints_json_receipt(self) -> None:
