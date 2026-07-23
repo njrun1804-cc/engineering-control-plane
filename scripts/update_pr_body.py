@@ -351,6 +351,30 @@ def create(
         body=body,
         candidate_worktree=candidate_worktree,
     )
+    try:
+        existing = json.loads(
+            _gh(
+                "pr",
+                "list",
+                "--repo",
+                repo,
+                "--head",
+                branch,
+                "--state",
+                "open",
+                "--json",
+                "number,isDraft,headRefOid",
+            )
+        )
+    except json.JSONDecodeError as exc:
+        raise CommandError("could not inspect existing pull requests for candidate branch") from exc
+    if not isinstance(existing, list):
+        raise CommandError("GitHub pull request list did not return an array")
+    if existing:
+        numbers = ", ".join(str(item.get("number")) for item in existing if isinstance(item, dict))
+        raise CommandError(
+            f"candidate branch already has open pull request(s) {numbers}; use --pr"
+        )
     _git(candidate_worktree, "push", "origin", f"HEAD:refs/heads/{branch}")
     url = _gh(
         "pr",

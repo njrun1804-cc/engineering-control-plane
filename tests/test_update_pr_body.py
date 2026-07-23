@@ -498,7 +498,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
         verify_dependencies: mock.Mock,
     ) -> None:
         git.side_effect = ["c" * 40, "codex/new", "docs/guide.md", None]
-        gh.return_value = "https://github.com/o/r/pull/7"
+        gh.side_effect = ["[]", "https://github.com/o/r/pull/7", ""]
         draft = {
             "body": "valid",
             "headRefName": "codex/new",
@@ -522,7 +522,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             )
         self.assertEqual(receipt["pull_request"], 7)
         self.assertEqual(
-            gh.call_args_list[0].args,
+            gh.call_args_list[1].args,
             (
                 "pr",
                 "create",
@@ -560,7 +560,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
         verify_dependencies: mock.Mock,
     ) -> None:
         git.side_effect = ["c" * 40, "codex/new", "src/main.py", None]
-        gh.return_value = "https://github.com/o/r/pull/7"
+        gh.side_effect = ["[]", "https://github.com/o/r/pull/7", ""]
         gh_json.return_value = {
             "body": "concurrent body",
             "headRefName": "codex/new",
@@ -584,6 +584,41 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
         self.assertEqual(
             gh.call_args_list[-1].args,
             ("pr", "ready", "7", "--repo", "o/r", "--undo"),
+        )
+
+    @mock.patch.object(MODULE, "_verify_dependencies")
+    @mock.patch.object(MODULE, "_git")
+    @mock.patch.object(MODULE, "_gh")
+    @mock.patch.object(MODULE, "parse_dependencies", return_value=[])
+    @mock.patch.object(MODULE, "validate", return_value=[])
+    def test_create_rejects_existing_open_pr_before_push(
+        self,
+        validate: mock.Mock,
+        parse_dependencies: mock.Mock,
+        gh: mock.Mock,
+        git: mock.Mock,
+        verify_dependencies: mock.Mock,
+    ) -> None:
+        git.side_effect = ["c" * 40, "codex/new", "src/main.py"]
+        gh.return_value = json.dumps(
+            [{"number": 7, "isDraft": False, "headRefOid": "b" * 40}]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            body = root / "body.md"
+            body.write_text("valid")
+            (root / "docs").mkdir()
+            (root / "docs" / "agent-ready.md").write_text("safe")
+            with self.assertRaisesRegex(MODULE.CommandError, "already has open pull request"):
+                MODULE.create(
+                    repo="o/r",
+                    title="Ready candidate",
+                    body_file=body,
+                    candidate_worktree=root,
+                )
+        self.assertNotIn(
+            ("push", "origin", "HEAD:refs/heads/codex/new"),
+            [call.args[1:] for call in git.call_args_list],
         )
 
 
