@@ -429,7 +429,13 @@ jobs:
         run: |
           case "$PROFILE" in
             seraph) uv sync --frozen ;;
-            cloudops) uv sync --locked ;;
+            cloudops)
+              # Absorbed into Zion at packages/cloudops (standalone subproject with its own
+              # pyproject/uv.lock/check.sh). Run from the nested package root, not the Zion
+              # workspace root.
+              cd packages/cloudops
+              uv sync --locked
+              ;;
             atlas) uv sync --frozen --all-extras --dev ;;
           esac
 
@@ -438,9 +444,21 @@ jobs:
           PROFILE: ${{ inputs.profile }}
         run: |
           case "$PROFILE" in
-            cloudops) ./check.sh ;;
+            cloudops)
+              cd packages/cloudops
+              ./check.sh
+              ;;
             *) scripts/check.sh ;;
           esac
 
       - name: Validate authoritative receipt
-        run: scripts/check-status.sh --strict
+        env:
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          case "$PROFILE" in
+            cloudops)
+              cd packages/cloudops
+              scripts/check-status.sh --strict
+              ;;
+            *) scripts/check-status.sh --strict ;;
+          esac
