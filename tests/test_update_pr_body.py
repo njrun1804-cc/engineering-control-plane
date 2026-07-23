@@ -449,6 +449,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             receipt = {"schema_version": "pr_brief_preflight.v2"}
             with (
                 mock.patch.object(MODULE, "update", return_value=receipt),
+                mock.patch.object(MODULE, "_write_receipt") as write_receipt,
                 mock.patch("builtins.print") as output,
             ):
                 self.assertEqual(
@@ -464,7 +465,22 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                     ),
                     0,
                 )
+        write_receipt.assert_called_once_with(receipt, receipt_root=None)
         self.assertEqual(json.loads(output.call_args.args[0]), receipt)
+
+    def test_receipt_is_atomically_persisted_at_the_fleet_path(self) -> None:
+        receipt = {
+            "schema_version": "pr_brief_preflight.v2",
+            "repository": "njrun1804-cc/Zion",
+            "pull_request": 43,
+            "head_sha": "a" * 40,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = MODULE._write_receipt(receipt, receipt_root=root)
+            self.assertEqual(path, root / "njrun1804-cc" / "Zion" / "43.json")
+            self.assertEqual(json.loads(path.read_text()), receipt)
+            self.assertEqual(list(path.parent.glob("*.tmp")), [])
 
     @mock.patch.object(MODULE, "_verify_dependencies")
     @mock.patch.object(MODULE, "_git")

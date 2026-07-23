@@ -7,7 +7,9 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 from types import ModuleType
@@ -150,6 +152,35 @@ def _receipt(
         "validator_sha256": hashlib.sha256(VALIDATOR.read_bytes()).hexdigest(),
         "risk_result_count": risk_result_count(body),
     }
+
+
+def _write_receipt(
+    receipt: dict[str, object],
+    *,
+    receipt_root: Path | None = None,
+) -> Path:
+    repository = str(receipt["repository"])
+    owner, name = repository.split("/", maxsplit=1)
+    root = receipt_root or (
+        Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state"))
+        / "pr-brief-preflight"
+    )
+    target = root / owner / name / f"{int(receipt['pull_request'])}.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{target.name}.",
+        suffix=".tmp",
+        dir=target.parent,
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(receipt, stream, sort_keys=True)
+            stream.write("\n")
+        os.replace(temporary, target)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return target
 
 
 def _candidate(
@@ -399,6 +430,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--body-file", required=True, type=Path)
     parser.add_argument("--candidate-worktree", type=Path)
     parser.add_argument("--push-candidate", action="store_true")
+    parser.add_argument("--receipt-root", type=Path)
     args = parser.parse_args(argv)
     if args.push_candidate and args.candidate_worktree is None:
         parser.error("--push-candidate requires --candidate-worktree")
@@ -427,6 +459,7 @@ def main(argv: list[str] | None = None) -> int:
     except (CommandError, subprocess.CalledProcessError) as exc:
         print(exc)
         return 1
+    _write_receipt(receipt, receipt_root=args.receipt_root)
     print(json.dumps(receipt, sort_keys=True))
     return 0
 
