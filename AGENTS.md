@@ -5,6 +5,11 @@ This public, credential-free repository owns reusable CI execution and policy fo
 `njrun1804-cc`. It contains checks and policy only, never application code, protected acceptance
 tests, or secrets. Protected acceptance tests belong in a separate private repository.
 
+ECP is the independent public protocol backend. Zion is the CC workspace's local operator
+frontend and resolves ECP validator/sender bytes from the exact commit pinned in workspace policy.
+Ordinary fleet work uses `zion pr validate/send`; direct script invocation here is for bootstrap,
+recovery, and control-plane development.
+
 ## Agent verification loop
 
 - Each implementation task names and runs its exact targeted checks.
