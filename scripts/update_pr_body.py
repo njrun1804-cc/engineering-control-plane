@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -14,23 +16,31 @@ VALIDATOR = ROOT / "scripts" / "validate_pr_brief.py"
 
 
 def update(*, repo: str, pull_request: int, body_file: Path, gh: str = "gh") -> None:
-    subprocess.run(
-        [sys.executable, str(VALIDATOR), "--body-file", str(body_file)],
-        check=True,
-    )
-    subprocess.run(
-        [
-            gh,
-            "pr",
-            "edit",
-            str(pull_request),
-            "--repo",
-            repo,
-            "--body-file",
-            str(body_file),
-        ],
-        check=True,
-    )
+    body = body_file.read_bytes()
+    with tempfile.NamedTemporaryFile(prefix="pr-body-", suffix=".md", delete=False) as handle:
+        handle.write(body)
+        snapshot = Path(handle.name)
+    os.chmod(snapshot, 0o600)
+    try:
+        subprocess.run(
+            [sys.executable, str(VALIDATOR), "--body-file", str(snapshot)],
+            check=True,
+        )
+        subprocess.run(
+            [
+                gh,
+                "pr",
+                "edit",
+                str(pull_request),
+                "--repo",
+                repo,
+                "--body-file",
+                str(snapshot),
+            ],
+            check=True,
+        )
+    finally:
+        snapshot.unlink(missing_ok=True)
 
 
 def main(argv: list[str] | None = None) -> int:
