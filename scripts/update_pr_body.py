@@ -37,7 +37,9 @@ class CommandError(RuntimeError):
     """A required Git or GitHub operation failed."""
 
 
-def _command(args: list[str], *, cwd: Path | None = None, capture: bool = True) -> str | None:
+def _command(
+    args: list[str], *, cwd: Path | None = None, capture: bool = True
+) -> str | None:
     try:
         result = subprocess.run(
             args,
@@ -191,7 +193,13 @@ def update(
     _git(candidate_worktree, "fetch", "origin", branch)
     remote_head = str(_git(candidate_worktree, "rev-parse", f"origin/{branch}"))
     if remote_head != pull.get("headRefOid"):
-        raise BriefValidationError("local remote-tracking head does not match GitHub PR head")
+        raise BriefValidationError(
+            "local remote-tracking head does not match GitHub PR head"
+        )
+    if not push_candidate and head_sha != pull.get("headRefOid"):
+        raise BriefValidationError(
+            "candidate HEAD does not match GitHub PR head; use --push-candidate"
+        )
     previous_body = str(pull.get("body") or "")
     _gh("pr", "edit", str(pull_request), "--repo", repo, "--body", body)
     if push_candidate:
@@ -223,6 +231,16 @@ def update(
             "body,headRefName,headRefOid,state,url",
         )
         if observed.get("headRefOid") != head_sha:
+            if observed.get("body") == body:
+                _gh(
+                    "pr",
+                    "edit",
+                    str(pull_request),
+                    "--repo",
+                    repo,
+                    "--body",
+                    previous_body,
+                )
             raise CommandError("GitHub PR head does not match pushed candidate")
     return _receipt(
         repo=repo,

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -95,7 +96,11 @@ def _sections(body: str) -> tuple[dict[str, list[str]], list[str]]:
     for heading in REQUIRED_HEADINGS:
         start = positions[heading] + 1
         end = next(
-            (index for index in range(start, len(lines)) if lines[index].startswith("## ")),
+            (
+                index
+                for index in range(start, len(lines))
+                if lines[index].startswith("## ")
+            ),
             len(lines),
         )
         sections[heading] = lines[start:end]
@@ -105,7 +110,11 @@ def _sections(body: str) -> tuple[dict[str, list[str]], list[str]]:
 def _label_blocks(lines: list[str], labels: tuple[str, ...]) -> dict[str, list[str]]:
     positions = {
         label: next(
-            (index for index, line in enumerate(lines) if line.strip().startswith(label)),
+            (
+                index
+                for index, line in enumerate(lines)
+                if line.strip().startswith(label)
+            ),
             None,
         )
         for label in labels
@@ -117,7 +126,11 @@ def _label_blocks(lines: list[str], labels: tuple[str, ...]) -> dict[str, list[s
             continue
         line = lines[position].strip()
         inline = line[len(label) :].strip()
-        later = [value for value in positions.values() if value is not None and value > position]
+        later = [
+            value
+            for value in positions.values()
+            if value is not None and value > position
+        ]
         end = min(later) if later else len(lines)
         values = ([inline] if inline else []) + [
             item.strip().removeprefix("-").strip()
@@ -235,14 +248,26 @@ def validate(
                     f"hypothesis {index} claims docs-only but code-bearing files changed"
                 )
             continue
-        if result.startswith("unavailable:") and result.removeprefix("unavailable:").strip():
+        if (
+            result.startswith("unavailable:")
+            and result.removeprefix("unavailable:").strip()
+        ):
             boundary = result.removeprefix("unavailable:").strip()
-            if agent_ready_text is None or boundary.casefold() not in agent_ready_text.casefold():
-                errors.append(f"hypothesis {index} unavailable boundary is not documented")
+            if (
+                agent_ready_text is None
+                or boundary.casefold() not in agent_ready_text.casefold()
+            ):
+                errors.append(
+                    f"hypothesis {index} unavailable boundary is not documented"
+                )
             continue
         if result:
             errors.append(f"hypothesis {index} is not closed")
-    adjacent = [value for value in impact["Adjacent:"] if value.casefold() not in {"none", "n/a"}]
+    adjacent = [
+        value
+        for value in impact["Adjacent:"]
+        if value.casefold() not in {"none", "n/a"}
+    ]
     if adjacent and len(hypotheses) < 2:
         errors.append("an adjacent impact requires a second risk hypothesis")
 
@@ -254,7 +279,9 @@ def validate(
     evidence = _label_blocks(sections["## Evidence"], EVIDENCE_LABELS)
     for label in EVIDENCE_LABELS:
         if not evidence[label]:
-            errors.append(f"missing evidence field: {label.removeprefix('- ').removesuffix(':')}")
+            errors.append(
+                f"missing evidence field: {label.removeprefix('- ').removesuffix(':')}"
+            )
     return errors
 
 
@@ -281,12 +308,31 @@ def main(argv: list[str] | None = None) -> int:
         if agent_ready_file is None and os.environ.get("AGENT_READY_FILE"):
             agent_ready_file = Path(os.environ["AGENT_READY_FILE"])
         agent_ready_text = (
-            agent_ready_file.read_text(encoding="utf-8") if agent_ready_file is not None else None
+            agent_ready_file.read_text(encoding="utf-8")
+            if agent_ready_file is not None
+            else None
         )
     except OSError as exc:
         print(f"could not read agent-ready contract: {exc}", file=sys.stderr)
         return 2
-    errors = validate(body, agent_ready_text=agent_ready_text)
+    changed_files = None
+    if os.environ.get("PR_CHANGED_FILES_JSON"):
+        try:
+            value = json.loads(os.environ["PR_CHANGED_FILES_JSON"])
+        except json.JSONDecodeError as exc:
+            print(f"could not parse changed files: {exc}", file=sys.stderr)
+            return 2
+        if not isinstance(value, list) or not all(
+            isinstance(path, str) for path in value
+        ):
+            print("changed files must be a JSON array of strings", file=sys.stderr)
+            return 2
+        changed_files = value
+    errors = validate(
+        body,
+        agent_ready_text=agent_ready_text,
+        changed_files=changed_files,
+    )
     if not errors:
         print("Agent-ready PR execution brief: PASS")
         return 0

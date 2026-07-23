@@ -102,7 +102,9 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
 
     def test_missing_heading_fails(self) -> None:
         body = VALID_BODY.replace("## Risk hypotheses\n", "")
-        self.assertIn("missing required heading: ## Risk hypotheses", MODULE.validate(body))
+        self.assertIn(
+            "missing required heading: ## Risk hypotheses", MODULE.validate(body)
+        )
 
     def test_duplicate_heading_fails(self) -> None:
         body = VALID_BODY + "\n## Intent\nA second intent.\n"
@@ -127,7 +129,9 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
             "- Permissions or secrets:\n"
             "- Rollout or rollback considerations:",
         )
-        self.assertIn("empty required section: ## Operational changes", MODULE.validate(body))
+        self.assertIn(
+            "empty required section: ## Operational changes", MODULE.validate(body)
+        )
 
     def test_risk_hypothesis_requires_all_fields(self) -> None:
         body = VALID_BODY.replace(
@@ -138,13 +142,17 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
     def test_failed_or_pending_risk_result_fails(self) -> None:
         for result in ("fail: reproduced", "pending: not run"):
             with self.subTest(result=result):
-                body = VALID_BODY.replace("pass: the focused unit test rejects the body.", result)
+                body = VALID_BODY.replace(
+                    "pass: the focused unit test rejects the body.", result
+                )
                 self.assertIn("hypothesis 1 is not closed", MODULE.validate(body))
 
     def test_one_to_three_hypotheses_are_required(self) -> None:
         one = (
             VALID_BODY.split("### Hypothesis 2", 1)[0]
-            + VALID_BODY.split("## Validation path", 1)[1].join(["\n## Validation path", ""])
+            + VALID_BODY.split("## Validation path", 1)[1].join(
+                ["\n## Validation path", ""]
+            )
         ).replace("- Public and private profiles.", "- none", 1)
         self.assertEqual(MODULE.validate(one), [])
         four = VALID_BODY.replace(
@@ -163,7 +171,9 @@ Pre-push result: pass: fourth passed.
 
 ## Validation path""",
         )
-        self.assertIn("risk hypotheses must contain one to three entries", MODULE.validate(four))
+        self.assertIn(
+            "risk hypotheses must contain one to three entries", MODULE.validate(four)
+        )
 
     def test_dependency_reference_requires_full_head(self) -> None:
         body = VALID_BODY.replace("- none", "- njrun1804-cc/Contracts#17 @ deadbeef", 1)
@@ -194,7 +204,8 @@ Pre-push result: pass: fourth passed.
         end = VALID_BODY.index("## Validation path")
         body = VALID_BODY[:marker] + VALID_BODY[end:]
         self.assertIn(
-            "an adjacent impact requires a second risk hypothesis", MODULE.validate(body)
+            "an adjacent impact requires a second risk hypothesis",
+            MODULE.validate(body),
         )
 
     def test_docs_only_result_rejects_code_changes(self) -> None:
@@ -206,7 +217,9 @@ Pre-push result: pass: fourth passed.
             "hypothesis 1 claims docs-only but code-bearing files changed",
             MODULE.validate(body, changed_files=["src/main.py"]),
         )
-        self.assertEqual(MODULE.validate(body, changed_files=["docs/guide.md", "README.md"]), [])
+        self.assertEqual(
+            MODULE.validate(body, changed_files=["docs/guide.md", "README.md"]), []
+        )
 
     def test_body_file_preflight_passes_without_environment_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -231,8 +244,36 @@ Pre-push result: pass: fourth passed.
             body.write_text(body_text)
             contract = Path(directory) / "agent-ready.md"
             contract.write_text("Provider mutation is outside CI.")
-            with mock.patch.dict(os.environ, {"AGENT_READY_FILE": str(contract)}, clear=False):
+            with mock.patch.dict(
+                os.environ, {"AGENT_READY_FILE": str(contract)}, clear=False
+            ):
                 self.assertEqual(MODULE.main(["--body-file", str(body)]), 0)
+
+    def test_environment_changed_files_close_docs_only_ci_bypass(self) -> None:
+        body_text = VALID_BODY.replace(
+            "pass: the focused unit test rejects the body.",
+            "not applicable: docs-only",
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.md"
+            body.write_text(body_text)
+            with mock.patch.dict(
+                os.environ,
+                {"PR_CHANGED_FILES_JSON": '["src/main.py"]'},
+                clear=False,
+            ):
+                self.assertEqual(MODULE.main(["--body-file", str(body)]), 2)
+
+    def test_environment_changed_files_must_be_string_array(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            body = Path(directory) / "body.md"
+            body.write_text(VALID_BODY)
+            with mock.patch.dict(
+                os.environ,
+                {"PR_CHANGED_FILES_JSON": '{"src/main.py": true}'},
+                clear=False,
+            ):
+                self.assertEqual(MODULE.main(["--body-file", str(body)]), 2)
 
 
 if __name__ == "__main__":
