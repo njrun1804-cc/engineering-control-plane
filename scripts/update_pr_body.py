@@ -68,6 +68,38 @@ def _gh_json(*args: str) -> dict[str, object]:
     return value
 
 
+def _open_pull_requests(
+    *, repo: str, branch: str, attempts: int = 1
+) -> list[dict[str, object]]:
+    value: object = []
+    for attempt in range(attempts):
+        try:
+            value = json.loads(
+                _gh(
+                    "pr",
+                    "list",
+                    "--repo",
+                    repo,
+                    "--head",
+                    branch,
+                    "--state",
+                    "open",
+                    "--json",
+                    "number,isDraft,headRefOid",
+                )
+            )
+        except json.JSONDecodeError as exc:
+            raise CommandError(
+                "could not inspect existing pull requests for candidate branch"
+            ) from exc
+        if not isinstance(value, list) or any(not isinstance(item, dict) for item in value):
+            raise CommandError("GitHub pull request list did not return an array of objects")
+        if value or attempt + 1 == attempts:
+            break
+        time.sleep(1)
+    return value
+
+
 def _git(worktree: Path, *args: str) -> str | None:
     return _command(["git", "-C", str(worktree), *args], capture=args[0] != "push")
 
@@ -351,46 +383,34 @@ def create(
         body=body,
         candidate_worktree=candidate_worktree,
     )
-    try:
-        existing = json.loads(
-            _gh(
-                "pr",
-                "list",
-                "--repo",
-                repo,
-                "--head",
-                branch,
-                "--state",
-                "open",
-                "--json",
-                "number,isDraft,headRefOid",
-            )
-        )
-    except json.JSONDecodeError as exc:
-        raise CommandError("could not inspect existing pull requests for candidate branch") from exc
-    if not isinstance(existing, list):
-        raise CommandError("GitHub pull request list did not return an array")
+    existing = _open_pull_requests(repo=repo, branch=branch)
     if existing:
-        numbers = ", ".join(str(item.get("number")) for item in existing if isinstance(item, dict))
+        numbers = ", ".join(str(item.get("number")) for item in existing)
         raise CommandError(
             f"candidate branch already has open pull request(s) {numbers}; use --pr"
         )
     _git(candidate_worktree, "push", "origin", f"HEAD:refs/heads/{branch}")
-    url = _gh(
-        "pr",
-        "create",
-        "--repo",
-        repo,
-        "--title",
-        title,
-        "--body",
-        body,
-        "--draft",
-        "--head",
-        branch,
-        "--base",
-        base,
-    )
+    try:
+        url = _gh(
+            "pr",
+            "create",
+            "--repo",
+            repo,
+            "--title",
+            title,
+            "--body",
+            body,
+            "--draft",
+            "--head",
+            branch,
+            "--base",
+            base,
+        )
+    except CommandError:
+        for pull in _open_pull_requests(repo=repo, branch=branch, attempts=5):
+            if pull.get("isDraft") is False:
+                _quarantine_pull_request(repo=repo, pull_request=int(pull["number"]))
+        raise
     observed = _gh_json(
         "pr",
         "view",
