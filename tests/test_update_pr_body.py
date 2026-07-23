@@ -17,6 +17,29 @@ SPEC.loader.exec_module(MODULE)
 
 
 class UpdatePullRequestBodyTests(unittest.TestCase):
+    @mock.patch.object(MODULE, "_gh_json")
+    def test_dependency_may_be_open_or_merged_at_the_exact_head(
+        self,
+        gh_json: mock.Mock,
+    ) -> None:
+        dependency = {
+            "repository": "o/upstream",
+            "pull_request": 7,
+            "head_sha": "a" * 40,
+        }
+        for state in ("OPEN", "MERGED"):
+            gh_json.return_value = {"state": state, "headRefOid": "a" * 40}
+            MODULE._verify_dependencies([dependency])
+
+        gh_json.return_value = {"state": "CLOSED", "headRefOid": "a" * 40}
+        with self.assertRaisesRegex(
+            MODULE.BriefValidationError, "neither open nor merged"
+        ):
+            MODULE._verify_dependencies([dependency])
+        gh_json.return_value = {"state": "MERGED", "headRefOid": "b" * 40}
+        with self.assertRaisesRegex(MODULE.BriefValidationError, "head drifted"):
+            MODULE._verify_dependencies([dependency])
+
     @mock.patch.object(MODULE.subprocess, "run")
     @mock.patch.object(MODULE, "validate", return_value=[])
     def test_validated_body_is_sent_in_memory(

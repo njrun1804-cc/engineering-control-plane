@@ -84,8 +84,10 @@ def _verify_dependencies(dependencies: list[dict[str, object]]) -> None:
             "--json",
             "headRefOid,state",
         )
-        if observed.get("state") != "OPEN":
-            raise BriefValidationError(f"dependency {repository}#{number} is not open")
+        if observed.get("state") not in {"OPEN", "MERGED"}:
+            raise BriefValidationError(
+                f"dependency {repository}#{number} is neither open nor merged"
+            )
         if observed.get("headRefOid") != expected:
             raise BriefValidationError(f"dependency {repository}#{number} head drifted")
 
