@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import json
+import os
+import tempfile
 from pathlib import Path
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -80,16 +84,20 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
 
     def test_missing_heading_fails(self) -> None:
         body = VALID_BODY.replace("## Risk hypotheses\n", "")
-        self.assertIn("missing required heading: ## Risk hypotheses", MODULE.validate(body))
+        self.assertIn(
+            "missing required heading: ## Risk hypotheses", MODULE.validate(body)
+        )
 
     def test_duplicate_heading_fails(self) -> None:
         body = VALID_BODY + "\n## Intent\nA second intent.\n"
         self.assertIn("duplicated required heading: ## Intent", MODULE.validate(body))
 
     def test_reordered_headings_fail(self) -> None:
-        body = VALID_BODY.replace("## Intent", "## TEMP", 1).replace(
-            "## Behavioral contract", "## Intent", 1
-        ).replace("## TEMP", "## Behavioral contract", 1)
+        body = (
+            VALID_BODY.replace("## Intent", "## TEMP", 1)
+            .replace("## Behavioral contract", "## Intent", 1)
+            .replace("## TEMP", "## Behavioral contract", 1)
+        )
         self.assertEqual(MODULE.validate(body), ["required headings are out of order"])
 
     def test_blank_operational_labels_fail(self) -> None:
@@ -103,7 +111,26 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
             "- Permissions or secrets:\n"
             "- Rollout or rollback considerations:",
         )
-        self.assertIn("empty required section: ## Operational changes", MODULE.validate(body))
+        self.assertIn(
+            "empty required section: ## Operational changes", MODULE.validate(body)
+        )
+
+    def test_event_payload_preserves_multiline_body(self) -> None:
+        with tempfile.TemporaryDirectory() as raw_dir:
+            event = Path(raw_dir) / "event.json"
+            event.write_text(
+                json.dumps({"pull_request": {"body": VALID_BODY}}), encoding="utf-8"
+            )
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "GITHUB_EVENT_PATH": str(event),
+                    "PR_BODY": VALID_BODY.replace("\n", r"\n"),
+                },
+                clear=False,
+            ):
+                self.assertEqual(MODULE._pull_request_body(), VALID_BODY)
+                self.assertEqual(MODULE.validate(MODULE._pull_request_body()), [])
 
 
 if __name__ == "__main__":
