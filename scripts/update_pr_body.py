@@ -108,7 +108,7 @@ def _observe_pushed_candidate(
             "--repo",
             repo,
             "--json",
-            "body,headRefName,headRefOid,state,url",
+            "body,headRefName,headRefOid,isDraft,state,url",
         )
         if observed.get("headRefOid") == head_sha:
             return observed
@@ -126,6 +126,10 @@ def _quarantine_pull_request(*, repo: str, pull_request: int) -> None:
         repo,
         "--undo",
     )
+
+
+def _publish_ready_pull_request(*, repo: str, pull_request: int) -> None:
+    _gh("pr", "ready", str(pull_request), "--repo", repo)
 
 
 def _receipt(
@@ -221,7 +225,7 @@ def update(
         "--repo",
         repo,
         "--json",
-        "body,headRefName,headRefOid,state,url",
+        "body,headRefName,headRefOid,isDraft,state,url",
     )
     if pull.get("state") != "OPEN":
         raise BriefValidationError(f"pull request {pull_request} is not open")
@@ -239,6 +243,8 @@ def update(
         raise BriefValidationError(
             "candidate HEAD does not match GitHub PR head; use --push-candidate"
         )
+    if pull.get("isDraft") is not True:
+        _quarantine_pull_request(repo=repo, pull_request=pull_request)
     _gh("pr", "edit", str(pull_request), "--repo", repo, "--body", body)
     if push_candidate:
         try:
@@ -259,6 +265,39 @@ def update(
         if observed.get("headRefOid") != head_sha:
             _quarantine_pull_request(repo=repo, pull_request=pull_request)
             raise CommandError("GitHub PR head does not match pushed candidate")
+    observed = _gh_json(
+        "pr",
+        "view",
+        str(pull_request),
+        "--repo",
+        repo,
+        "--json",
+        "body,headRefName,headRefOid,isDraft,state,url",
+    )
+    if (
+        observed.get("headRefOid") != head_sha
+        or observed.get("body") != body
+        or observed.get("isDraft") is not True
+    ):
+        _quarantine_pull_request(repo=repo, pull_request=pull_request)
+        raise CommandError("draft pull request does not match validated candidate")
+    _publish_ready_pull_request(repo=repo, pull_request=pull_request)
+    ready = _gh_json(
+        "pr",
+        "view",
+        str(pull_request),
+        "--repo",
+        repo,
+        "--json",
+        "body,headRefName,headRefOid,isDraft,state,url",
+    )
+    if (
+        ready.get("headRefOid") != head_sha
+        or ready.get("body") != body
+        or ready.get("isDraft") is not False
+    ):
+        _quarantine_pull_request(repo=repo, pull_request=pull_request)
+        raise CommandError("ready pull request does not match validated candidate")
     return _receipt(
         repo=repo,
         pull_request=pull_request,
@@ -291,6 +330,7 @@ def create(
         title,
         "--body",
         body,
+        "--draft",
         "--head",
         branch,
         "--base",
@@ -303,9 +343,13 @@ def create(
         "--repo",
         repo,
         "--json",
-        "body,headRefName,headRefOid,state,url",
+        "body,headRefName,headRefOid,isDraft,state,url",
     )
-    if observed.get("headRefOid") != head_sha or observed.get("body") != body:
+    if (
+        observed.get("headRefOid") != head_sha
+        or observed.get("body") != body
+        or observed.get("isDraft") is not True
+    ):
         try:
             pull_request = int(url.rstrip("/").rsplit("/", maxsplit=1)[-1])
         except ValueError as exc:
@@ -318,6 +362,23 @@ def create(
         pull_request = int(str(observed["url"]).rstrip("/").rsplit("/", maxsplit=1)[-1])
     except (KeyError, ValueError) as exc:
         raise CommandError("could not resolve created pull request number") from exc
+    _publish_ready_pull_request(repo=repo, pull_request=pull_request)
+    ready = _gh_json(
+        "pr",
+        "view",
+        str(pull_request),
+        "--repo",
+        repo,
+        "--json",
+        "body,headRefName,headRefOid,isDraft,state,url",
+    )
+    if (
+        ready.get("headRefOid") != head_sha
+        or ready.get("body") != body
+        or ready.get("isDraft") is not False
+    ):
+        _quarantine_pull_request(repo=repo, pull_request=pull_request)
+        raise CommandError("ready pull request does not match validated candidate")
     return _receipt(
         repo=repo,
         pull_request=pull_request,

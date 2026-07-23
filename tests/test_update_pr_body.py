@@ -116,6 +116,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                 "body": "old",
                 "headRefName": "codex/change",
                 "headRefOid": "a" * 40,
+                "isDraft": False,
                 "state": "OPEN",
                 "url": "https://github.com/o/r/pull/1",
             },
@@ -123,6 +124,23 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                 "body": "valid",
                 "headRefName": "codex/change",
                 "headRefOid": "b" * 40,
+                "isDraft": True,
+                "state": "OPEN",
+                "url": "https://github.com/o/r/pull/1",
+            },
+            {
+                "body": "valid",
+                "headRefName": "codex/change",
+                "headRefOid": "b" * 40,
+                "isDraft": True,
+                "state": "OPEN",
+                "url": "https://github.com/o/r/pull/1",
+            },
+            {
+                "body": "valid",
+                "headRefName": "codex/change",
+                "headRefOid": "b" * 40,
+                "isDraft": False,
                 "state": "OPEN",
                 "url": "https://github.com/o/r/pull/1",
             },
@@ -152,8 +170,9 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
         self.assertEqual(receipt["schema_version"], "pr_brief_preflight.v2")
         self.assertEqual(receipt["head_sha"], "b" * 40)
         self.assertEqual(receipt["risk_result_count"], 0)
-        gh.assert_called_once_with(
-            "pr", "edit", "1", "--repo", "o/r", "--body", "valid"
+        self.assertEqual(
+            gh.call_args_list[-1].args,
+            ("pr", "ready", "1", "--repo", "o/r"),
         )
         self.assertEqual(
             git.call_args_list[-1].args[1:],
@@ -183,6 +202,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             "body": "old",
             "headRefName": "codex/change",
             "headRefOid": "a" * 40,
+            "isDraft": False,
             "state": "OPEN",
             "url": "https://github.com/o/r/pull/1",
         }
@@ -190,8 +210,15 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             **initial,
             "body": "valid",
             "headRefOid": "b" * 40,
+            "isDraft": True,
         }
-        gh_json.side_effect = [initial, {**initial, "body": "valid"}, propagated]
+        gh_json.side_effect = [
+            initial,
+            {**initial, "body": "valid", "isDraft": True},
+            propagated,
+            propagated,
+            {**propagated, "isDraft": False},
+        ]
         git.side_effect = [
             "b" * 40,
             "codex/change",
@@ -456,13 +483,15 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
     ) -> None:
         git.side_effect = ["c" * 40, "codex/new", "docs/guide.md", None]
         gh.return_value = "https://github.com/o/r/pull/7"
-        gh_json.return_value = {
+        draft = {
             "body": "valid",
             "headRefName": "codex/new",
             "headRefOid": "c" * 40,
+            "isDraft": True,
             "state": "OPEN",
             "url": "https://github.com/o/r/pull/7",
         }
+        gh_json.side_effect = [draft, {**draft, "isDraft": False}]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             body = root / "body.md"
@@ -477,7 +506,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             )
         self.assertEqual(receipt["pull_request"], 7)
         self.assertEqual(
-            gh.call_args.args,
+            gh.call_args_list[0].args,
             (
                 "pr",
                 "create",
@@ -487,11 +516,16 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                 "Ready candidate",
                 "--body",
                 "valid",
+                "--draft",
                 "--head",
                 "codex/new",
                 "--base",
                 "main",
             ),
+        )
+        self.assertEqual(
+            gh.call_args_list[-1].args,
+            ("pr", "ready", "7", "--repo", "o/r"),
         )
 
     @mock.patch.object(MODULE, "_verify_dependencies")
