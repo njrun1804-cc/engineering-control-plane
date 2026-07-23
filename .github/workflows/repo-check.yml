@@ -142,19 +142,26 @@ jobs:
               return errors
 
 
+          def _normalize_transport_newlines(body: str) -> str:
+              """Restore reusable-workflow escaped line breaks without touching normal Markdown."""
+              if "\n" not in body and r"\n" in body:
+                  return body.replace(r"\r\n", "\n").replace(r"\n", "\n").replace(r"\r", "\n")
+              return body
+
+
           def _pull_request_body() -> str:
               """Read a multiline-safe PR body from the event or the workflow's JSON transport."""
               if event_path := os.environ.get("GITHUB_EVENT_PATH"):
                   payload = json.loads(Path(event_path).read_text(encoding="utf-8"))
                   pull_request = payload.get("pull_request")
                   if isinstance(pull_request, dict) and isinstance(pull_request.get("body"), str):
-                      return pull_request["body"]
+                      return _normalize_transport_newlines(pull_request["body"])
               if encoded_body := os.environ.get("PR_BODY_JSON"):
                   body = json.loads(encoded_body)
                   if not isinstance(body, str):
                       raise ValueError("PR_BODY_JSON must decode to a string")
-                  return body
-              return os.environ.get("PR_BODY", "")
+                  return _normalize_transport_newlines(body)
+              return _normalize_transport_newlines(os.environ.get("PR_BODY", ""))
 
 
           def main() -> int:

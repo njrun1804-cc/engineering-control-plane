@@ -125,7 +125,7 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
                 os.environ,
                 {
                     "GITHUB_EVENT_PATH": str(event),
-                    "PR_BODY_JSON": json.dumps(VALID_BODY),
+                    "PR_BODY_JSON": json.dumps(VALID_BODY.replace("\n", r"\n")),
                     "PR_BODY": VALID_BODY.replace("\n", r"\n"),
                 },
                 clear=False,
