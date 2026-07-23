@@ -22,6 +22,13 @@ and availability.
 Consumers pin reusable workflows to a full commit SHA. Updates are deliberate fleet migrations,
 not mutable-tag changes.
 
+Every non-Dependabot pull request must carry the agent-ready execution brief represented by
+`.github/PULL_REQUEST_TEMPLATE.md`: intent, behavioral contract, impact surface, risk hypotheses,
+validation path, evidence, and operational changes. The reusable workflows enforce those stable
+section names so Codex, CI, Greptile, and T-Rex receive the same change contract. Repository-native
+setup, fixtures, targeted commands, and the canonical gate remain in each repository rather than
+being replaced with a second generic command layer.
+
 `policies/default-branch-ruleset.json` is the applied organization ruleset source. Retired
 repositories are explicitly excluded. For active repositories it requires a
 pull request, the common `repo-check / repo-check` status, current-base testing, resolved

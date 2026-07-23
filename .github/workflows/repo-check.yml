@@ -33,6 +33,27 @@ jobs:
             *) echo "Unsupported centrally owned profile: $PROFILE" >&2; exit 2 ;;
           esac
 
+      - name: Validate agent-ready PR execution brief
+        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          required=(
+            "## Intent"
+            "## Behavioral contract"
+            "## Impact surface"
+            "## Risk hypotheses"
+            "## Validation path"
+            "## Evidence"
+            "## Operational changes"
+          )
+          for heading in "${required[@]}"; do
+            if ! grep -Fqx "$heading" <<<"$PR_BODY"; then
+              echo "Missing required PR execution-brief heading: $heading" >&2
+              exit 2
+            fi
+          done
+
       - name: Set up uv and Python
         if: inputs.profile != 'control-plane'
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
