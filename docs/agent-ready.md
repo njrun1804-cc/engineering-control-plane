@@ -31,4 +31,6 @@
   `policies/default-branch-ruleset.json` are the control surface.
 - **Latency sequence:** after focused proof and PR-body preflight, push the candidate head so CI
   and external AI review start together, then run the repository's authoritative local gate while
-  those remote checks are in flight. Merge still requires every proof on the unchanged exact SHA.
+  those remote checks are in flight. Callers include `edited` and `ready_for_review` in their
+  pull-request triggers so body-only repair cannot reuse a stale validation event. Merge still
+  requires every proof on the unchanged exact SHA.

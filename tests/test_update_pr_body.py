@@ -116,6 +116,7 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
                 "body": "old",
                 "headRefName": "codex/change",
                 "headRefOid": "a" * 40,
+                "headRepository": {"nameWithOwner": "O/R"},
                 "isDraft": False,
                 "state": "OPEN",
                 "url": "https://github.com/o/r/pull/1",
