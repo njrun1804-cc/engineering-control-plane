@@ -306,7 +306,7 @@ def update(
     head_repository = pull.get("headRepository")
     if pull.get("isCrossRepository") is True or (
         isinstance(head_repository, dict)
-        and head_repository.get("nameWithOwner") != repo
+        and str(head_repository.get("nameWithOwner", "")).casefold() != repo.casefold()
     ):
         raise BriefValidationError(
             "cross-repository PR heads are not supported by --push-candidate"

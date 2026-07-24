@@ -283,6 +283,15 @@ Pre-push result: pass: fourth passed.
             workflow = path.read_text(encoding="utf-8")
             self.assertIn(".previous_filename // empty", workflow)
 
+    def test_ci_revalidates_body_edits_and_ready_transitions(self) -> None:
+        workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "types: [opened, synchronize, reopened, edited, ready_for_review]",
+            workflow,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
