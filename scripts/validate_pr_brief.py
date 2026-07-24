@@ -71,15 +71,40 @@ def _visible_body(body: str) -> str:
     return re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL)
 
 
+FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
+
+
 def _fenced(lines: list[str]) -> list[bool]:
-    """Mark every line that opens, closes, or sits inside a ``` fenced code block."""
+    """Mark every line that opens, closes, or sits inside a fenced code block.
+
+    CommonMark rules: a fence opens with three or more backticks or tildes after
+    up to three spaces of indent; only a fence of the same character, at least
+    as long, and with no trailing info string closes it. Anything else inside —
+    a tilde fence within a backtick fence, a shorter run of the same character —
+    is content. An unclosed fence runs to the end of the document.
+    """
     mask = []
-    open_fence = False
+    open_char = ""
+    open_length = 0
     for line in lines:
-        delimiter = line.strip().startswith("```")
-        mask.append(open_fence or delimiter)
-        if delimiter:
-            open_fence = not open_fence
+        match = FENCE_RE.match(line)
+        if not open_char:
+            if match:
+                open_char = match.group(1)[0]
+                open_length = len(match.group(1))
+                mask.append(True)
+            else:
+                mask.append(False)
+            continue
+        mask.append(True)
+        if (
+            match
+            and match.group(1)[0] == open_char
+            and len(match.group(1)) >= open_length
+            and not match.group(2).strip()
+        ):
+            open_char = ""
+            open_length = 0
     return mask
 
 

@@ -121,6 +121,34 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
         )
         self.assertEqual(MODULE.validate(body), [])
 
+    def test_longer_fence_keeps_shorter_fence_example_as_content(self) -> None:
+        body = VALID_BODY.replace(
+            "- Runtime artifacts: unittest output.",
+            "- Runtime artifacts: unittest output.\n"
+            "````\n"
+            "```\n"
+            "## Intent\n"
+            "```\n"
+            "````",
+        )
+        self.assertEqual(MODULE.validate(body), [])
+
+    def test_tilde_fence_keeps_backtick_fence_as_content(self) -> None:
+        body = VALID_BODY.replace(
+            "- Runtime artifacts: unittest output.",
+            "- Runtime artifacts: unittest output.\n"
+            "~~~\n"
+            "```\n"
+            "## Intent\n"
+            "```\n"
+            "~~~",
+        )
+        self.assertEqual(MODULE.validate(body), [])
+
+    def test_unclosed_fence_masks_the_rest_of_the_document(self) -> None:
+        body = VALID_BODY + "\n```\n## Intent\nnever closed\n"
+        self.assertEqual(MODULE.validate(body), [])
+
     def test_reordered_headings_fail(self) -> None:
         body = (
             VALID_BODY.replace("## Intent", "## TEMP", 1)
