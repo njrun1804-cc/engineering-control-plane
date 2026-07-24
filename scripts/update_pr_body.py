@@ -28,9 +28,11 @@ def _load_validator() -> ModuleType:
     return module
 
 
-validate = _load_validator().validate
-parse_dependencies = _load_validator().parse_dependencies
-risk_result_count = _load_validator().risk_result_count
+_validator = _load_validator()
+validate = _validator.validate
+parse_dependencies = _validator.parse_dependencies
+risk_result_count = _validator.risk_result_count
+strip_html_comments = _validator._visible_body
 
 
 class BriefValidationError(ValueError):
@@ -186,7 +188,14 @@ def _receipt(
         "repository": repo,
         "pull_request": pull_request,
         "head_sha": head_sha,
+        # Despite its name, visible_body_sha256 hashes the FULL body including HTML
+        # comments; Zion (zion/pr_delivery.py, zion/fleet_delivery.py) compares it to
+        # a full-body-file digest, so it must stay full-body. stripped_body_sha256 is
+        # the honest digest of the body a reviewer actually sees.
         "visible_body_sha256": hashlib.sha256(body.encode()).hexdigest(),
+        "stripped_body_sha256": hashlib.sha256(
+            strip_html_comments(body).encode()
+        ).hexdigest(),
         "dependencies": dependencies,
         "validator_sha256": hashlib.sha256(VALIDATOR.read_bytes()).hexdigest(),
         "risk_result_count": risk_result_count(body),

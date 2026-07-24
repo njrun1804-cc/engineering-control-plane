@@ -71,14 +71,31 @@ def _visible_body(body: str) -> str:
     return re.sub(r"<!--.*?-->", "", body, flags=re.DOTALL)
 
 
+def _fenced(lines: list[str]) -> list[bool]:
+    """Mark every line that opens, closes, or sits inside a ``` fenced code block."""
+    mask = []
+    open_fence = False
+    for line in lines:
+        delimiter = line.strip().startswith("```")
+        mask.append(open_fence or delimiter)
+        if delimiter:
+            open_fence = not open_fence
+    return mask
+
+
 def _sections(body: str) -> tuple[dict[str, list[str]], list[str]]:
     visible = _visible_body(body)
     lines = visible.splitlines()
+    fenced = _fenced(lines)
     positions: dict[str, int] = {}
     errors: list[str] = []
 
     for heading in REQUIRED_HEADINGS:
-        matches = [index for index, line in enumerate(lines) if line.strip() == heading]
+        matches = [
+            index
+            for index, line in enumerate(lines)
+            if line.strip() == heading and not fenced[index]
+        ]
         if len(matches) != 1:
             qualifier = "missing" if not matches else "duplicated"
             errors.append(f"{qualifier} required heading: {heading}")
@@ -99,7 +116,7 @@ def _sections(body: str) -> tuple[dict[str, list[str]], list[str]]:
             (
                 index
                 for index in range(start, len(lines))
-                if lines[index].startswith("## ")
+                if lines[index].startswith("## ") and not fenced[index]
             ),
             len(lines),
         )
@@ -189,12 +206,22 @@ def risk_result_count(body: str) -> int:
     return len(_hypotheses(sections["## Risk hypotheses"]))
 
 
+DOCS_ONLY_SUFFIXES = (".md", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp")
+
+
 def _is_docs_only(paths: list[str]) -> bool:
     return bool(paths) and all(
-        path == "README.md"
-        or path.endswith(".md")
-        or path.startswith(("docs/", ".github/ISSUE_TEMPLATE/"))
-        for path in paths
+        path.lower().endswith(DOCS_ONLY_SUFFIXES) for path in paths
+    )
+
+
+def _boundary_documented(boundary: str, agent_ready_text: str) -> bool:
+    """Require the declared boundary as a word-anchored match, never a bare substring."""
+    pattern = re.compile(
+        rf"(?<![0-9A-Za-z_]){re.escape(boundary.casefold())}(?![0-9A-Za-z_])"
+    )
+    return any(
+        pattern.search(line.casefold()) for line in agent_ready_text.splitlines()
     )
 
 
@@ -253,9 +280,8 @@ def validate(
             and result.removeprefix("unavailable:").strip()
         ):
             boundary = result.removeprefix("unavailable:").strip()
-            if (
-                agent_ready_text is None
-                or boundary.casefold() not in agent_ready_text.casefold()
+            if agent_ready_text is None or not _boundary_documented(
+                boundary, agent_ready_text
             ):
                 errors.append(
                     f"hypothesis {index} unavailable boundary is not documented"
