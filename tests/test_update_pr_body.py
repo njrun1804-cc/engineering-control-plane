@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import tempfile
@@ -557,6 +558,24 @@ class UpdatePullRequestBodyTests(unittest.TestCase):
             ("pr", "ready", "1", "--repo", "o/r", "--undo"),
         )
         self.assertEqual(sleep.call_count, 5)
+
+    def test_receipt_keeps_full_body_digest_and_adds_stripped_digest(self) -> None:
+        body = "## Intent\n<!-- hidden note -->\nVisible line.\n"
+        receipt = MODULE._receipt(
+            repo="o/r",
+            pull_request=1,
+            head_sha="a" * 40,
+            body=body,
+            dependencies=[],
+        )
+        self.assertEqual(
+            receipt["visible_body_sha256"],
+            hashlib.sha256(body.encode()).hexdigest(),
+        )
+        self.assertEqual(
+            receipt["stripped_body_sha256"],
+            hashlib.sha256("## Intent\n\nVisible line.\n".encode()).hexdigest(),
+        )
 
     def test_main_prints_json_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

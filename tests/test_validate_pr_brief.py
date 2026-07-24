@@ -110,6 +110,64 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
         body = VALID_BODY + "\n## Intent\nA second intent.\n"
         self.assertIn("duplicated required heading: ## Intent", MODULE.validate(body))
 
+    def test_heading_inside_fenced_code_block_is_not_a_duplicate(self) -> None:
+        body = VALID_BODY.replace(
+            "- Runtime artifacts: unittest output.",
+            "- Runtime artifacts: unittest output.\n"
+            "```\n"
+            "## Intent\n"
+            "## Evidence\n"
+            "```",
+        )
+        self.assertEqual(MODULE.validate(body), [])
+
+    def test_longer_fence_keeps_shorter_fence_example_as_content(self) -> None:
+        body = VALID_BODY.replace(
+            "- Runtime artifacts: unittest output.",
+            "- Runtime artifacts: unittest output.\n"
+            "````\n"
+            "```\n"
+            "## Intent\n"
+            "```\n"
+            "````",
+        )
+        self.assertEqual(MODULE.validate(body), [])
+
+    def test_tilde_fence_keeps_backtick_fence_as_content(self) -> None:
+        body = VALID_BODY.replace(
+            "- Runtime artifacts: unittest output.",
+            "- Runtime artifacts: unittest output.\n"
+            "~~~\n"
+            "```\n"
+            "## Intent\n"
+            "```\n"
+            "~~~",
+        )
+        self.assertEqual(MODULE.validate(body), [])
+
+    def test_unclosed_fence_masks_the_rest_of_the_document(self) -> None:
+        body = VALID_BODY + "\n```\n## Intent\nnever closed\n"
+        self.assertEqual(MODULE.validate(body), [])
+
+    def test_backtick_info_string_with_backtick_is_not_a_fence_opener(self) -> None:
+        # CommonMark: a backtick fence's info string may not contain a backtick,
+        # so this line is ordinary content and must not mask later headings.
+        body = VALID_BODY.replace(
+            "- Runtime artifacts: unittest output.",
+            "- Runtime artifacts: unittest output.\n```python `example`",
+        )
+        self.assertEqual(MODULE.validate(body), [])
+
+    def test_tilde_fence_info_string_may_contain_backticks(self) -> None:
+        body = VALID_BODY.replace(
+            "- Runtime artifacts: unittest output.",
+            "- Runtime artifacts: unittest output.\n"
+            "~~~python `example`\n"
+            "## Intent\n"
+            "~~~",
+        )
+        self.assertEqual(MODULE.validate(body), [])
+
     def test_reordered_headings_fail(self) -> None:
         body = (
             VALID_BODY.replace("## Intent", "## TEMP", 1)
@@ -199,6 +257,18 @@ Pre-push result: pass: fourth passed.
             [],
         )
 
+    def test_unavailable_boundary_rejects_bare_substring_matches(self) -> None:
+        body = VALID_BODY.replace(
+            "pass: the focused unit test rejects the body.",
+            "unavailable: provider mutation",
+        )
+        self.assertIn(
+            "hypothesis 1 unavailable boundary is not documented",
+            MODULE.validate(
+                body, agent_ready_text="The improvider mutations are unrelated."
+            ),
+        )
+
     def test_adjacent_surface_requires_a_second_hypothesis(self) -> None:
         marker = VALID_BODY.index("### Hypothesis 2")
         end = VALID_BODY.index("## Validation path")
@@ -219,6 +289,22 @@ Pre-push result: pass: fourth passed.
         )
         self.assertEqual(
             MODULE.validate(body, changed_files=["docs/guide.md", "README.md"]), []
+        )
+
+    def test_docs_only_is_judged_by_suffix_not_directory(self) -> None:
+        body = VALID_BODY.replace(
+            "pass: the focused unit test rejects the body.",
+            "not applicable: docs-only",
+        )
+        self.assertIn(
+            "hypothesis 1 claims docs-only but code-bearing files changed",
+            MODULE.validate(body, changed_files=["docs/helper.py"]),
+        )
+        self.assertEqual(
+            MODULE.validate(
+                body, changed_files=["notes.txt", "docs/diagram.png", "guide.md"]
+            ),
+            [],
         )
 
     def test_body_file_preflight_passes_without_environment_state(self) -> None:
