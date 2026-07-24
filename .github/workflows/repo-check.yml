@@ -130,10 +130,11 @@ jobs:
               """Mark every line that opens, closes, or sits inside a fenced code block.
 
               CommonMark rules: a fence opens with three or more backticks or tildes after
-              up to three spaces of indent; only a fence of the same character, at least
-              as long, and with no trailing info string closes it. Anything else inside —
-              a tilde fence within a backtick fence, a shorter run of the same character —
-              is content. An unclosed fence runs to the end of the document.
+              up to three spaces of indent; a backtick fence's info string may not contain
+              a backtick (a tilde fence's may); only a fence of the same character, at
+              least as long, and with no trailing info string closes it. Anything else
+              inside — a tilde fence within a backtick fence, a shorter run of the same
+              character — is content. An unclosed fence runs to the end of the document.
               """
               mask = []
               open_char = ""
@@ -141,7 +142,9 @@ jobs:
               for line in lines:
                   match = FENCE_RE.match(line)
                   if not open_char:
-                      if match:
+                      if match and not (
+                          match.group(1)[0] == "`" and "`" in match.group(2)
+                      ):
                           open_char = match.group(1)[0]
                           open_length = len(match.group(1))
                           mask.append(True)

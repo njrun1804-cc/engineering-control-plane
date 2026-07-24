@@ -149,6 +149,25 @@ class ValidatePullRequestBriefTests(unittest.TestCase):
         body = VALID_BODY + "\n```\n## Intent\nnever closed\n"
         self.assertEqual(MODULE.validate(body), [])
 
+    def test_backtick_info_string_with_backtick_is_not_a_fence_opener(self) -> None:
+        # CommonMark: a backtick fence's info string may not contain a backtick,
+        # so this line is ordinary content and must not mask later headings.
+        body = VALID_BODY.replace(
+            "- Runtime artifacts: unittest output.",
+            "- Runtime artifacts: unittest output.\n```python `example`",
+        )
+        self.assertEqual(MODULE.validate(body), [])
+
+    def test_tilde_fence_info_string_may_contain_backticks(self) -> None:
+        body = VALID_BODY.replace(
+            "- Runtime artifacts: unittest output.",
+            "- Runtime artifacts: unittest output.\n"
+            "~~~python `example`\n"
+            "## Intent\n"
+            "~~~",
+        )
+        self.assertEqual(MODULE.validate(body), [])
+
     def test_reordered_headings_fail(self) -> None:
         body = (
             VALID_BODY.replace("## Intent", "## TEMP", 1)
